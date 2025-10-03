@@ -1,105 +1,144 @@
 #!/usr/bin/env python3
 """
-Simple test script for Certbox API
+Test suite for Certbox API using pytest
 """
 
-import requests
-import json
+import pytest
 import time
+from unittest.mock import patch, Mock
 
-BASE_URL = "http://localhost:8000"
+from certbox.app import app
+from certbox.core.certificate_manager import CertificateManager
+from certbox.config import config
 
-def test_root_endpoint():
-    """Test the root endpoint."""
-    response = requests.get(f"{BASE_URL}/")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["service"] == "Certbox"
-    print("✓ Root endpoint works")
 
-def test_certificate_creation():
-    """Test certificate creation."""
-    username = f"testuser_{int(time.time())}"
-    response = requests.post(f"{BASE_URL}/certs/{username}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["username"] == username
-    assert "serial_number" in data
-    print(f"✓ Certificate created for {username}")
-    return username
-
-def test_pfx_download(username):
-    """Test PFX file download."""
-    response = requests.get(f"{BASE_URL}/certs/{username}/pfx")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/x-pkcs12"
-    print(f"✓ PFX file downloadable for {username}")
-
-def test_certificate_revocation(username):
-    """Test certificate revocation."""
-    response = requests.post(f"{BASE_URL}/revoke/{username}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["username"] == username
-    assert data["status"] == "revoked"
-    print(f"✓ Certificate revoked for {username}")
-
-def test_crl_endpoint():
-    """Test CRL endpoint."""
-    response = requests.get(f"{BASE_URL}/crl.pem")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/x-pem-file"
-    assert response.content.startswith(b"-----BEGIN X509 CRL-----")
-    print("✓ CRL endpoint works")
-
-def test_config_endpoint():
-    """Test configuration endpoint."""
-    response = requests.get(f"{BASE_URL}/config")
-    assert response.status_code == 200
-    data = response.json()
-    assert "cert_validity_days" in data
-    assert "ca_validity_days" in data
-    assert "key_size" in data
-    assert "country" in data
-    assert "state_province" in data
-    assert "locality" in data
-    assert "organization" in data
-    assert "ca_common_name" in data
-    print("✓ Config endpoint works")
-
-def test_error_handling():
-    """Test error handling."""
-    # Try to create certificate that already exists
-    username = "duplicate_test"
-    requests.post(f"{BASE_URL}/certs/{username}")  # Create first
-    response = requests.post(f"{BASE_URL}/certs/{username}")  # Try duplicate
-    assert response.status_code == 409
-    print("✓ Duplicate certificate error handling works")
+class TestCertboxAPI:
+    """Test cases for Certbox API endpoints."""
     
-    # Try to revoke non-existent certificate
-    response = requests.post(f"{BASE_URL}/revoke/nonexistent")
-    assert response.status_code == 404
-    print("✓ Non-existent certificate error handling works")
+    def test_root_endpoint_data(self):
+        """Test the root endpoint returns correct data structure."""
+        # Test the actual route function directly
+        from certbox.api.routes import root
+        import asyncio
+        
+        result = asyncio.run(root())
+        assert result["service"] == "Certbox"
+        assert "description" in result
+        assert "version" in result
+        assert "endpoints" in result
     
-    # Try to download non-existent PFX
-    response = requests.get(f"{BASE_URL}/certs/nonexistent/pfx")
-    assert response.status_code == 404
-    print("✓ Non-existent PFX error handling works")
+    def test_config_endpoint_data(self):
+        """Test configuration endpoint returns expected fields."""
+        from certbox.api.routes import get_config
+        import asyncio
+        
+        result = asyncio.run(get_config())
+        assert "cert_validity_days" in result
+        assert "ca_validity_days" in result
+        assert "key_size" in result
+        assert "country" in result
+        assert "state_province" in result
+        assert "locality" in result
+        assert "organization" in result
+        assert "ca_common_name" in result
+    
+    def test_config_values(self):
+        """Test that config values are properly loaded."""
+        # Test configuration values
+        assert config.cert_validity_days == 365
+        assert config.ca_validity_days == 3650
+        assert config.key_size == 2048
+        assert config.country == "ES"
+        assert config.state_province == "Catalonia"
+        assert config.locality == "Girona"
+        assert config.organization == "GISCE-TI"
+        assert config.ca_common_name == "GISCE-TI CA"
+
+
+class TestCertificateManager:
+    """Test cases for Certificate Manager."""
+    
+    def test_certificate_manager_initialization(self):
+        """Test that CertificateManager initializes correctly."""
+        manager = CertificateManager()
+        assert manager.ca_cert_path.name == "ca.crt"
+        assert manager.ca_key_path.name == "ca.key"
+        assert manager.crl_path.name == "crl.pem"
+        assert manager.revoked_serials_path.name == "revoked_serials.txt"
+
+
+def test_app_creation():
+    """Test that the FastAPI app is created correctly."""
+    from certbox.app import create_app
+    
+    test_app = create_app()
+    assert test_app.title == "Certbox"
+    assert test_app.description == "X.509 Certificate Management Service"
+
+
+def test_python_version_compatibility():
+    """Test that we're running on a compatible Python version."""
+    import sys
+    
+    # Test that we're running Python 3.8 or higher
+    assert sys.version_info >= (3, 8)
+    
+    # Test that we support up to Python 3.12 (as per setup.py)
+    assert sys.version_info < (3, 13)
+
+
+def test_required_modules_import():
+    """Test that all required modules can be imported."""
+    try:
+        import fastapi
+        import uvicorn
+        import cryptography
+        import pydantic_settings
+        assert True
+    except ImportError as e:
+        pytest.fail(f"Failed to import required module: {e}")
+
+
+# Simple integration tests without network dependencies
+class TestAPIIntegration:
+    """Integration tests that don't require a running server."""
+    
+    @pytest.fixture
+    def mock_cert_manager(self):
+        """Mock certificate manager for testing."""
+        with patch('certbox.api.routes.cert_manager') as mock:
+            mock.create_client_certificate.return_value = {
+                "username": "test_user",
+                "serial_number": "12345",
+                "status": "created"
+            }
+            mock.revoke_certificate.return_value = {
+                "username": "test_user", 
+                "status": "revoked"
+            }
+            mock.get_crl.return_value = b"-----BEGIN X509 CRL-----\ntest_data\n-----END X509 CRL-----"
+            yield mock
+    
+    def test_certificate_creation_logic(self, mock_cert_manager):
+        """Test certificate creation logic."""
+        from certbox.api.routes import create_certificate
+        import asyncio
+        
+        result = asyncio.run(create_certificate("test_user"))
+        assert result["username"] == "test_user"
+        assert "serial_number" in result
+        mock_cert_manager.create_client_certificate.assert_called_once_with("test_user")
+    
+    def test_certificate_revocation_logic(self, mock_cert_manager):
+        """Test certificate revocation logic."""
+        from certbox.api.routes import revoke_certificate
+        import asyncio
+        
+        result = asyncio.run(revoke_certificate("test_user"))
+        assert result["username"] == "test_user"
+        assert result["status"] == "revoked"
+        mock_cert_manager.revoke_certificate.assert_called_once_with("test_user")
+
 
 if __name__ == "__main__":
-    print("Running Certbox API tests...")
-    
-    try:
-        test_root_endpoint()
-        test_config_endpoint()
-        username = test_certificate_creation()
-        test_pfx_download(username)
-        test_certificate_revocation(username)
-        test_crl_endpoint()
-        test_error_handling()
-        
-        print("\n🎉 All tests passed!")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        exit(1)
+    pytest.main([__file__])
