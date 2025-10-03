@@ -1,0 +1,50 @@
+services:
+  certbox:
+    build: .
+    container_name: certbox
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist certificate data
+      - certbox_ca:/app/ca
+      - certbox_crts:/app/crts
+      - certbox_private:/app/private
+      - certbox_clients:/app/clients
+      - certbox_requests:/app/requests
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Example nginx service that can use the certificates
+  nginx:
+    image: nginx:alpine
+    container_name: certbox-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      # Mount certificate directories from certbox service
+      - certbox_ca:/etc/nginx/certs/ca:ro
+      - certbox_crts:/etc/nginx/certs/crts:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - certbox
+    restart: unless-stopped
+    profiles:
+      - nginx
+
+volumes:
+  certbox_ca:
+    driver: local
+  certbox_crts:
+    driver: local
+  certbox_private:
+    driver: local
+  certbox_clients:
+    driver: local
+  certbox_requests:
+    driver: local
