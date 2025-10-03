@@ -52,6 +52,21 @@ def test_crl_endpoint():
     assert response.content.startswith(b"-----BEGIN X509 CRL-----")
     print("✓ CRL endpoint works")
 
+def test_config_endpoint():
+    """Test configuration endpoint."""
+    response = requests.get(f"{BASE_URL}/config")
+    assert response.status_code == 200
+    data = response.json()
+    assert "cert_validity_days" in data
+    assert "ca_validity_days" in data
+    assert "key_size" in data
+    assert "country" in data
+    assert "state_province" in data
+    assert "locality" in data
+    assert "organization" in data
+    assert "ca_common_name" in data
+    print("✓ Config endpoint works")
+
 def test_error_handling():
     """Test error handling."""
     # Try to create certificate that already exists
@@ -76,6 +91,7 @@ if __name__ == "__main__":
     
     try:
         test_root_endpoint()
+        test_config_endpoint()
         username = test_certificate_creation()
         test_pfx_download(username)
         test_certificate_revocation(username)
