@@ -15,6 +15,37 @@ Certbox is a lightweight REST API for managing client X.509 certificates using a
 
 ## Installation
 
+### Method 1: Docker (Recommended)
+
+1. Clone the repository:
+```bash
+git clone https://github.com/gisce/certbox.git
+cd certbox
+```
+
+2. Build and run with Docker:
+```bash
+# Build the Docker image
+docker build -t certbox .
+
+# Run the service
+docker run -p 8000:8000 \
+  -v certbox_ca:/app/ca \
+  -v certbox_crts:/app/crts \
+  -v certbox_private:/app/private \
+  -v certbox_clients:/app/clients \
+  certbox
+```
+
+3. Or use Docker Compose:
+```bash
+docker compose up -d
+```
+
+The service will be available at `http://localhost:8000`.
+
+### Method 2: Local Python
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/gisce/certbox.git
@@ -49,6 +80,18 @@ certbox/
 ├── clients/           # PFX files for browser installation
 └── requests/          # Certificate signing requests (future use)
 ```
+
+### Docker Volumes
+
+When using Docker, these directories are mounted as persistent volumes:
+
+- `certbox_ca` - Contains the CA certificate, key and CRL
+- `certbox_crts` - Contains client certificates  
+- `certbox_private` - Contains client private keys
+- `certbox_clients` - Contains PFX files for browser installation
+- `certbox_requests` - Contains certificate signing requests
+
+These volumes ensure data persistence across container restarts.
 
 ## API Endpoints
 
