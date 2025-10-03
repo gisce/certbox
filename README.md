@@ -193,7 +193,7 @@ python test_api.py
 
 ## Configuration
 
-The service can be configured using environment variables. All settings have sensible defaults:
+The service can be configured using environment variables or a `.env` file. All settings have sensible defaults:
 
 ### Certificate Settings
 - `CERTBOX_CERT_VALIDITY_DAYS` - Client certificate validity in days (default: 365)
@@ -207,12 +207,64 @@ The service can be configured using environment variables. All settings have sen
 - `CERTBOX_ORGANIZATION` - Organization name (default: "GISCE-TI")
 - `CERTBOX_CA_COMMON_NAME` - CA common name (default: "GISCE-TI CA")
 
-### Example Usage
+### Configuration Methods
+
+#### Method 1: Environment Variables
 ```bash
 # Run with custom configuration
 CERTBOX_ORGANIZATION="My Company" \
 CERTBOX_LOCALITY="Barcelona" \
 CERTBOX_CERT_VALIDITY_DAYS=730 \
+python main.py
+```
+
+#### Method 2: .env File
+Create a `.env` file in the project root directory:
+
+```bash
+# .env file
+CERTBOX_CERT_VALIDITY_DAYS=730
+CERTBOX_CA_VALIDITY_DAYS=7300
+CERTBOX_COUNTRY=ES
+CERTBOX_STATE_PROVINCE=Catalonia
+CERTBOX_LOCALITY=Barcelona
+CERTBOX_ORGANIZATION=My Company
+CERTBOX_CA_COMMON_NAME=My Company CA
+CERTBOX_KEY_SIZE=4096
+```
+
+Or copy and modify the example file:
+```bash
+cp .env.example .env
+# Edit .env with your preferred values
+```
+
+Then simply run:
+```bash
+python main.py
+```
+
+**Note:** Environment variables take precedence over .env file values.
+
+### Example Usage
+
+**Using environment variables:**
+```bash
+# Run with custom configuration
+CERTBOX_ORGANIZATION="My Company" \
+CERTBOX_LOCALITY="Barcelona" \
+CERTBOX_CERT_VALIDITY_DAYS=730 \
+python main.py
+```
+
+**Using .env file:**
+```bash
+# Create .env file with your configuration
+echo "CERTBOX_ORGANIZATION=My Company" > .env
+echo "CERTBOX_LOCALITY=Barcelona" >> .env
+echo "CERTBOX_CERT_VALIDITY_DAYS=730" >> .env
+
+# Run the service
 python main.py
 ```
 

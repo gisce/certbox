@@ -8,10 +8,10 @@ import os
 import datetime
 from pathlib import Path
 from typing import Dict, Any
-from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
+from pydantic_settings import BaseSettings
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -24,22 +24,26 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@dataclass
-class CertConfig:
+class CertConfig(BaseSettings):
     """Configuration for certificate generation."""
     # Validity periods
-    cert_validity_days: int = int(os.getenv("CERTBOX_CERT_VALIDITY_DAYS", "365"))
-    ca_validity_days: int = int(os.getenv("CERTBOX_CA_VALIDITY_DAYS", "3650"))
+    cert_validity_days: int = 365
+    ca_validity_days: int = 3650
     
     # Key configuration
-    key_size: int = int(os.getenv("CERTBOX_KEY_SIZE", "2048"))
+    key_size: int = 2048
     
     # Certificate subject information
-    country: str = os.getenv("CERTBOX_COUNTRY", "ES")
-    state_province: str = os.getenv("CERTBOX_STATE_PROVINCE", "Catalonia")
-    locality: str = os.getenv("CERTBOX_LOCALITY", "Girona")
-    organization: str = os.getenv("CERTBOX_ORGANIZATION", "GISCE-TI")
-    ca_common_name: str = os.getenv("CERTBOX_CA_COMMON_NAME", "GISCE-TI CA")
+    country: str = "ES"
+    state_province: str = "Catalonia"
+    locality: str = "Girona"
+    organization: str = "GISCE-TI"
+    ca_common_name: str = "GISCE-TI CA"
+
+    class Config:
+        env_prefix = "CERTBOX_"
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 # Global configuration instance
 config = CertConfig()
