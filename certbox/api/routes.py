@@ -1,0 +1,100 @@
+"""
+API route definitions for Certbox.
+"""
+
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import FileResponse
+
+from ..core import CertificateManager
+from ..config import config, CLIENTS_DIR
+
+# Initialize certificate manager
+cert_manager = CertificateManager()
+
+# Create router
+router = APIRouter()
+
+
+@router.post("/certs/{username}")
+async def create_certificate(username: str):
+    """Create a new client certificate for the specified user."""
+    try:
+        result = cert_manager.create_client_certificate(username)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create certificate: {str(e)}")
+
+
+@router.post("/revoke/{username}")
+async def revoke_certificate(username: str):
+    """Revoke a client certificate for the specified user."""
+    try:
+        result = cert_manager.revoke_certificate(username)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to revoke certificate: {str(e)}")
+
+
+@router.get("/crl.pem")
+async def get_crl():
+    """Get the Certificate Revocation List in PEM format."""
+    try:
+        crl_data = cert_manager.get_crl()
+        return Response(
+            content=crl_data,
+            media_type="application/x-pem-file",
+            headers={"Content-Disposition": "attachment; filename=crl.pem"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get CRL: {str(e)}")
+
+
+@router.get("/certs/{username}/pfx")
+async def download_pfx(username: str):
+    """Download the PFX file for a user's certificate."""
+    pfx_path = CLIENTS_DIR / f"{username}.pfx"
+    
+    if not pfx_path.exists():
+        raise HTTPException(status_code=404, detail=f"PFX file for user '{username}' not found")
+    
+    return FileResponse(
+        path=pfx_path,
+        filename=f"{username}.pfx",
+        media_type="application/x-pkcs12"
+    )
+
+
+@router.get("/config")
+async def get_config():
+    """Get the current certificate configuration."""
+    return {
+        "cert_validity_days": config.cert_validity_days,
+        "ca_validity_days": config.ca_validity_days,
+        "key_size": config.key_size,
+        "country": config.country,
+        "state_province": config.state_province,
+        "locality": config.locality,
+        "organization": config.organization,
+        "ca_common_name": config.ca_common_name
+    }
+
+
+@router.get("/")
+async def root():
+    """Root endpoint with service information."""
+    return {
+        "service": "Certbox",
+        "description": "X.509 Certificate Management Service",
+        "version": "1.0.0",
+        "endpoints": {
+            "create_certificate": "POST /certs/{username}",
+            "revoke_certificate": "POST /revoke/{username}",
+            "get_crl": "GET /crl.pem",
+            "download_pfx": "GET /certs/{username}/pfx",
+            "get_config": "GET /config"
+        }
+    }

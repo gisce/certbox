@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Certbox - X.509 Certificate Management Service
-Entry point for backward compatibility.
+Entry point for Certbox server.
 """
 
 import uvicorn
