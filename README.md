@@ -247,7 +247,7 @@ The CLI respects the same environment variables as the API server. You can confi
 ```bash
 # Set custom configuration for CLI operations
 export CERTBOX_ORGANIZATION="My Company"
-export CERTBOX_LOCALITY="Barcelona" 
+export CERTBOX_LOCALITY="Barcelona"
 export CERTBOX_CERT_VALIDITY_DAYS=730
 
 # Then use CLI commands
