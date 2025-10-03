@@ -80,11 +80,9 @@ cd certbox
 pip install -e .
 ```
 
-#### Option B: Install from PyPI (when available)
-```bash
-pip install certbox
-```
+#### Option B: Install from PyPI (coming soon)
 
+*PyPI installation is not yet available. The package will be published to PyPI soon. Please check back for updates or use Option A to install from source in the meantime.*
 Once installed, you can use Certbox in multiple ways:
 
 #### As a CLI tool:
