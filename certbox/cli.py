@@ -10,14 +10,28 @@ from fastapi import HTTPException
 
 from .core import CertificateManager
 from .app import app
-from .config import config as certbox_config
+from .config import config as certbox_config, create_config, CertConfig
+
+
+# Global variable to store the current configuration
+current_config: Optional[CertConfig] = None
 
 
 @click.group()
 @click.version_option(version="1.0.0", prog_name="certbox")
-def cli():
+@click.option('--config', 'config_file', help='Path to configuration file')
+def cli(config_file: Optional[str] = None):
     """Certbox - X.509 Certificate Management Service CLI"""
-    pass
+    global current_config
+    if config_file:
+        current_config = create_config(config_file)
+    else:
+        current_config = certbox_config
+
+
+def get_cert_manager() -> CertificateManager:
+    """Get a CertificateManager instance with the current configuration."""
+    return CertificateManager(current_config)
 
 
 @cli.command()
@@ -34,7 +48,7 @@ def api(host: str, port: int):
 def create(username: str):
     """Create a new client certificate for the specified username."""
     try:
-        cert_manager = CertificateManager()
+        cert_manager = get_cert_manager()
         result = cert_manager.create_client_certificate(username)
         
         click.echo(f"✓ Certificate created successfully for user: {username}")
@@ -58,7 +72,7 @@ def create(username: str):
 def revoke(username: str):
     """Revoke a client certificate for the specified username."""
     try:
-        cert_manager = CertificateManager()
+        cert_manager = get_cert_manager()
         result = cert_manager.revoke_certificate(username)
         
         click.echo(f"✓ Certificate revoked successfully for user: {username}")
@@ -77,22 +91,25 @@ def revoke(username: str):
 @cli.command()
 def config():
     """Show current Certbox configuration."""
+    config_instance = current_config or certbox_config
     click.echo("Current Certbox Configuration:")
-    click.echo(f"  Certificate validity: {certbox_config.cert_validity_days} days")
-    click.echo(f"  CA validity: {certbox_config.ca_validity_days} days")
-    click.echo(f"  Key size: {certbox_config.key_size} bits")
-    click.echo(f"  Country: {certbox_config.country}")
-    click.echo(f"  State/Province: {certbox_config.state_province}")
-    click.echo(f"  Locality: {certbox_config.locality}")
-    click.echo(f"  Organization: {certbox_config.organization}")
-    click.echo(f"  CA Common Name: {certbox_config.ca_common_name}")
+    click.echo(f"  Certificate validity: {config_instance.cert_validity_days} days")
+    click.echo(f"  CA validity: {config_instance.ca_validity_days} days")
+    click.echo(f"  Key size: {config_instance.key_size} bits")
+    click.echo(f"  Country: {config_instance.country}")
+    click.echo(f"  State/Province: {config_instance.state_province}")
+    click.echo(f"  Locality: {config_instance.locality}")
+    click.echo(f"  Organization: {config_instance.organization}")
+    click.echo(f"  CA Common Name: {config_instance.ca_common_name}")
+    if config_instance.root_dir:
+        click.echo(f"  Root Directory: {config_instance.root_dir}")
 
 
 @cli.command()
 def crl():
     """Get the Certificate Revocation List."""
     try:
-        cert_manager = CertificateManager()
+        cert_manager = get_cert_manager()
         crl_data = cert_manager.get_crl()
         
         # Output the CRL to stdout so it can be redirected to a file

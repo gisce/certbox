@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from ..core import CertificateManager
-from ..config import config, CLIENTS_DIR
+from ..config import config
 
 # Initialize certificate manager
 cert_manager = CertificateManager()
@@ -56,7 +56,10 @@ async def get_crl():
 @router.get("/certs/{username}/pfx")
 async def download_pfx(username: str):
     """Download the PFX file for a user's certificate."""
-    pfx_path = CLIENTS_DIR / f"{username}.pfx"
+    # Get directories for the default configuration
+    from ..config import get_directories
+    directories = get_directories(config)
+    pfx_path = directories['clients_dir'] / f"{username}.pfx"
     
     if not pfx_path.exists():
         raise HTTPException(status_code=404, detail=f"PFX file for user '{username}' not found")
@@ -71,7 +74,7 @@ async def download_pfx(username: str):
 @router.get("/config")
 async def get_config():
     """Get the current certificate configuration."""
-    return {
+    config_dict = {
         "cert_validity_days": config.cert_validity_days,
         "ca_validity_days": config.ca_validity_days,
         "key_size": config.key_size,
@@ -81,6 +84,12 @@ async def get_config():
         "organization": config.organization,
         "ca_common_name": config.ca_common_name
     }
+    
+    # Include root_dir if it's configured
+    if config.root_dir:
+        config_dict["root_dir"] = config.root_dir
+    
+    return config_dict
 
 
 @router.get("/")
