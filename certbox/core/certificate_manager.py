@@ -4,7 +4,7 @@ Certificate management module for Certbox.
 
 import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from fastapi import HTTPException
 from cryptography import x509
@@ -13,17 +13,23 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 
-from ..config import config, CA_DIR, CRTS_DIR, PRIVATE_DIR, CLIENTS_DIR
+from ..config import config, get_directories, CertConfig
 
 
 class CertificateManager:
     """Manages X.509 certificates and CA operations."""
     
-    def __init__(self):
-        self.ca_cert_path = CA_DIR / "ca.crt"
-        self.ca_key_path = CA_DIR / "ca.key"
-        self.crl_path = CA_DIR / "crl.pem"
-        self.revoked_serials_path = CA_DIR / "revoked_serials.txt"
+    def __init__(self, config_instance: Optional[CertConfig] = None):
+        # Use provided config or default global config
+        self.config = config_instance or config
+        
+        # Get directories based on configuration
+        self.directories = get_directories(self.config)
+        
+        self.ca_cert_path = self.directories['ca_dir'] / "ca.crt"
+        self.ca_key_path = self.directories['ca_dir'] / "ca.key"
+        self.crl_path = self.directories['ca_dir'] / "crl.pem"
+        self.revoked_serials_path = self.directories['ca_dir'] / "revoked_serials.txt"
         
         # Initialize CA if it doesn't exist
         if not self.ca_cert_path.exists() or not self.ca_key_path.exists():
@@ -34,16 +40,16 @@ class CertificateManager:
         # Generate CA private key
         ca_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=config.key_size,
+            key_size=self.config.key_size,
         )
         
         # Create CA certificate
         subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COUNTRY_NAME, config.country),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config.state_province),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, config.locality),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, config.organization),
-            x509.NameAttribute(NameOID.COMMON_NAME, config.ca_common_name),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, self.config.country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, self.config.state_province),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, self.config.locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.config.organization),
+            x509.NameAttribute(NameOID.COMMON_NAME, self.config.ca_common_name),
         ])
         
         ca_cert = x509.CertificateBuilder().subject_name(
@@ -57,7 +63,7 @@ class CertificateManager:
         ).not_valid_before(
             datetime.datetime.now(datetime.timezone.utc)
         ).not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=config.ca_validity_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=self.config.ca_validity_days)
         ).add_extension(
             x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
             critical=False,
@@ -126,9 +132,9 @@ class CertificateManager:
     def create_client_certificate(self, username: str) -> Dict[str, Any]:
         """Create a client certificate for the given username."""
         # Check if certificate already exists
-        cert_path = CRTS_DIR / f"{username}.crt"
-        key_path = PRIVATE_DIR / f"{username}.key"
-        pfx_path = CLIENTS_DIR / f"{username}.pfx"
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
+        key_path = self.directories['private_dir'] / f"{username}.key"
+        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
         
         if cert_path.exists():
             raise HTTPException(status_code=409, detail=f"Certificate for user '{username}' already exists")
@@ -139,15 +145,15 @@ class CertificateManager:
         # Generate client private key
         client_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=config.key_size,
+            key_size=self.config.key_size,
         )
         
         # Create client certificate
         subject = x509.Name([
-            x509.NameAttribute(NameOID.COUNTRY_NAME, config.country),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config.state_province),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, config.locality),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, config.organization),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, self.config.country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, self.config.state_province),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, self.config.locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.config.organization),
             x509.NameAttribute(NameOID.COMMON_NAME, username),
         ])
         
@@ -162,7 +168,7 @@ class CertificateManager:
         ).not_valid_before(
             datetime.datetime.now(datetime.timezone.utc)
         ).not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=config.cert_validity_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=self.config.cert_validity_days)
         ).add_extension(
             x509.SubjectKeyIdentifier.from_public_key(client_key.public_key()),
             critical=False,
@@ -227,7 +233,7 @@ class CertificateManager:
     
     def revoke_certificate(self, username: str) -> Dict[str, Any]:
         """Revoke a client certificate."""
-        cert_path = CRTS_DIR / f"{username}.crt"
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
         
         if not cert_path.exists():
             raise HTTPException(status_code=404, detail=f"Certificate for user '{username}' not found")

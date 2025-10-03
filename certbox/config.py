@@ -4,6 +4,7 @@ Configuration module for Certbox.
 
 from pathlib import Path
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class CertConfig(BaseSettings):
@@ -21,11 +22,49 @@ class CertConfig(BaseSettings):
     locality: str = "Girona"
     organization: str = "GISCE-TI"
     ca_common_name: str = "GISCE-TI CA"
+    
+    # Directory configuration
+    root_dir: str = ""
 
     class Config:
         env_prefix = "CERTBOX_"
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+
+def create_config(config_file: Optional[str] = None) -> CertConfig:
+    """Create a configuration instance with optional custom config file."""
+    if config_file:
+        return CertConfig(_env_file=config_file)
+    return CertConfig()
+
+
+def get_directories(config_instance: CertConfig):
+    """Get directory paths based on configuration."""
+    if config_instance.root_dir:
+        base_dir = Path(config_instance.root_dir).expanduser().resolve()
+    else:
+        # Default to project directory for backward compatibility
+        base_dir = Path(__file__).parent.parent
+    
+    ca_dir = base_dir / "ca"
+    crts_dir = base_dir / "crts"
+    private_dir = base_dir / "private"
+    clients_dir = base_dir / "clients"
+    requests_dir = base_dir / "requests"
+    
+    # Ensure directories exist
+    for directory in [ca_dir, crts_dir, private_dir, clients_dir, requests_dir]:
+        directory.mkdir(parents=True, exist_ok=True)
+    
+    return {
+        'base_dir': base_dir,
+        'ca_dir': ca_dir,
+        'crts_dir': crts_dir,
+        'private_dir': private_dir,
+        'clients_dir': clients_dir,
+        'requests_dir': requests_dir
+    }
 
 
 # Global configuration instance
@@ -36,14 +75,11 @@ CERT_VALIDITY_DAYS = config.cert_validity_days
 CA_VALIDITY_DAYS = config.ca_validity_days
 KEY_SIZE = config.key_size
 
-# Directory paths
-BASE_DIR = Path(__file__).parent.parent
-CA_DIR = BASE_DIR / "ca"
-CRTS_DIR = BASE_DIR / "crts"
-PRIVATE_DIR = BASE_DIR / "private"
-CLIENTS_DIR = BASE_DIR / "clients"
-REQUESTS_DIR = BASE_DIR / "requests"
-
-# Ensure directories exist
-for directory in [CA_DIR, CRTS_DIR, PRIVATE_DIR, CLIENTS_DIR, REQUESTS_DIR]:
-    directory.mkdir(exist_ok=True)
+# Directory paths (for backward compatibility)
+directories = get_directories(config)
+BASE_DIR = directories['base_dir']
+CA_DIR = directories['ca_dir']
+CRTS_DIR = directories['crts_dir']
+PRIVATE_DIR = directories['private_dir']
+CLIENTS_DIR = directories['clients_dir']
+REQUESTS_DIR = directories['requests_dir']
