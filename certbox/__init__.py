@@ -4,3 +4,11 @@ A FastAPI service for managing client certificates with a local CA.
 """
 
 __version__ = "1.0.0"
+__author__ = "GISCE-TI"
+__email__ = "devel@gisce.net"
+
+from .app import app
+from .config import config
+from .core import CertificateManager
+
+__all__ = ["app", "config", "CertificateManager", "__version__"]
