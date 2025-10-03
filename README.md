@@ -4,6 +4,28 @@
 
 Certbox is a lightweight REST API for managing client X.509 certificates using a custom CA. It supports issuing and revoking certificates, exporting .pfx files for browser use, and generating a CRL for mTLS setups with Nginx. Designed for simple, internal certificate workflows.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+  - [Method 1: Docker (Recommended)](#method-1-docker-recommended)
+  - [Method 2: Local Python Installation](#method-2-local-python-installation)
+  - [Method 2: Local Python (Legacy)](#method-2-local-python-legacy)
+- [CLI Usage](#cli-usage)
+  - [Available Commands](#available-commands)
+  - [CLI vs API Comparison](#cli-vs-api-comparison)
+  - [Environment Configuration for CLI](#environment-configuration-for-cli)
+- [Directory Structure](#directory-structure)
+- [API Endpoints](#api-endpoints)
+- [Usage Examples](#usage-examples)
+  - [API Examples](#api-examples)
+  - [CLI Examples](#cli-examples)
+- [Nginx mTLS Configuration](#nginx-mtls-configuration)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Security Notes](#security-notes)
+- [License](#license)
+
 ## Features
 
 - **Certificate Authority Management**: Automatically creates and manages a local CA
@@ -430,19 +452,26 @@ Run the included test suite with pytest:
 # Install testing dependencies
 pip install -r requirements-dev.txt
 
-# Run tests
+# Run API tests
 pytest test_api.py -v
+
+# Run CLI tests
+pytest test_cli.py -v
+
+# Run all tests
+pytest -v
 
 # Or run with the original method (deprecated)
 python test_api.py
 ```
 
 The test suite includes:
-- API endpoint testing
-- Configuration validation
-- Certificate manager functionality
-- Python version compatibility checks
-- Integration tests with mocked dependencies
+- **API endpoint testing** - REST API functionality and responses
+- **CLI command testing** - Command-line interface functionality
+- **Configuration validation** - Environment and .env file configuration
+- **Certificate manager functionality** - Core certificate operations
+- **Python version compatibility checks** - Support for Python 3.8+
+- **Integration tests with mocked dependencies** - Isolated testing without external dependencies
 
 Tests are also run automatically via GitHub Actions on Python 3.8, 3.9, 3.10, 3.11, and 3.12.
 
