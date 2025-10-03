@@ -106,6 +106,9 @@ These volumes ensure data persistence across container restarts.
 ### Certificate Revocation List
 - **GET /crl.pem** - Download the current CRL in PEM format
 
+### Configuration
+- **GET /config** - View current configuration settings
+
 ## Usage Examples
 
 ### Create a certificate
@@ -190,14 +193,49 @@ python test_api.py
 
 ## Configuration
 
-The service uses the following default settings:
+The service can be configured using environment variables. All settings have sensible defaults:
 
-- **Certificate Validity**: 365 days
-- **CA Validity**: 3650 days (10 years)
-- **Key Size**: 2048 bits
-- **Hash Algorithm**: SHA-256
+### Certificate Settings
+- `CERTBOX_CERT_VALIDITY_DAYS` - Client certificate validity in days (default: 365)
+- `CERTBOX_CA_VALIDITY_DAYS` - CA certificate validity in days (default: 3650)
+- `CERTBOX_KEY_SIZE` - RSA key size in bits (default: 2048)
 
-These can be modified in the `main.py` file if needed.
+### Certificate Subject Information
+- `CERTBOX_COUNTRY` - Country code (default: "ES")
+- `CERTBOX_STATE_PROVINCE` - State or province (default: "Catalonia")
+- `CERTBOX_LOCALITY` - City or locality (default: "Girona")
+- `CERTBOX_ORGANIZATION` - Organization name (default: "GISCE-TI")
+- `CERTBOX_CA_COMMON_NAME` - CA common name (default: "GISCE-TI CA")
+
+### Example Usage
+```bash
+# Run with custom configuration
+CERTBOX_ORGANIZATION="My Company" \
+CERTBOX_LOCALITY="Barcelona" \
+CERTBOX_CERT_VALIDITY_DAYS=730 \
+python main.py
+```
+
+### Configuration Endpoint
+You can view the current configuration by accessing the `/config` endpoint:
+
+```bash
+curl http://localhost:8000/config
+```
+
+Response:
+```json
+{
+    "cert_validity_days": 365,
+    "ca_validity_days": 3650,
+    "key_size": 2048,
+    "country": "ES",
+    "state_province": "Catalonia",
+    "locality": "Girona",
+    "organization": "GISCE-TI",
+    "ca_common_name": "GISCE-TI CA"
+}
+```
 
 ## Security Notes
 

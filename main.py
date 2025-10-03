@@ -8,6 +8,7 @@ import os
 import datetime
 from pathlib import Path
 from typing import Dict, Any
+from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
@@ -23,10 +24,30 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuration
-CERT_VALIDITY_DAYS = 365
-CA_VALIDITY_DAYS = 3650
-KEY_SIZE = 2048
+@dataclass
+class CertConfig:
+    """Configuration for certificate generation."""
+    # Validity periods
+    cert_validity_days: int = int(os.getenv("CERTBOX_CERT_VALIDITY_DAYS", "365"))
+    ca_validity_days: int = int(os.getenv("CERTBOX_CA_VALIDITY_DAYS", "3650"))
+    
+    # Key configuration
+    key_size: int = int(os.getenv("CERTBOX_KEY_SIZE", "2048"))
+    
+    # Certificate subject information
+    country: str = os.getenv("CERTBOX_COUNTRY", "ES")
+    state_province: str = os.getenv("CERTBOX_STATE_PROVINCE", "Catalonia")
+    locality: str = os.getenv("CERTBOX_LOCALITY", "Girona")
+    organization: str = os.getenv("CERTBOX_ORGANIZATION", "GISCE-TI")
+    ca_common_name: str = os.getenv("CERTBOX_CA_COMMON_NAME", "GISCE-TI CA")
+
+# Global configuration instance
+config = CertConfig()
+
+# Legacy constants for backward compatibility
+CERT_VALIDITY_DAYS = config.cert_validity_days
+CA_VALIDITY_DAYS = config.ca_validity_days
+KEY_SIZE = config.key_size
 
 # Directory paths
 BASE_DIR = Path(__file__).parent
@@ -58,16 +79,16 @@ class CertificateManager:
         # Generate CA private key
         ca_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=KEY_SIZE,
+            key_size=config.key_size,
         )
         
         # Create CA certificate
         subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COUNTRY_NAME, "ES"),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Catalonia"),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, "Girona"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "GISCE-TI"),
-            x509.NameAttribute(NameOID.COMMON_NAME, "GISCE-TI CA"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, config.country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config.state_province),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, config.locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, config.organization),
+            x509.NameAttribute(NameOID.COMMON_NAME, config.ca_common_name),
         ])
         
         ca_cert = x509.CertificateBuilder().subject_name(
@@ -81,7 +102,7 @@ class CertificateManager:
         ).not_valid_before(
             datetime.datetime.now(datetime.timezone.utc)
         ).not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=CA_VALIDITY_DAYS)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=config.ca_validity_days)
         ).add_extension(
             x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
             critical=False,
@@ -163,15 +184,15 @@ class CertificateManager:
         # Generate client private key
         client_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=KEY_SIZE,
+            key_size=config.key_size,
         )
         
         # Create client certificate
         subject = x509.Name([
-            x509.NameAttribute(NameOID.COUNTRY_NAME, "ES"),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Catalonia"),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, "Girona"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "GISCE-TI"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, config.country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config.state_province),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, config.locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, config.organization),
             x509.NameAttribute(NameOID.COMMON_NAME, username),
         ])
         
@@ -186,7 +207,7 @@ class CertificateManager:
         ).not_valid_before(
             datetime.datetime.now(datetime.timezone.utc)
         ).not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=CERT_VALIDITY_DAYS)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=config.cert_validity_days)
         ).add_extension(
             x509.SubjectKeyIdentifier.from_public_key(client_key.public_key()),
             critical=False,
@@ -360,6 +381,20 @@ async def download_pfx(username: str):
         media_type="application/x-pkcs12"
     )
 
+@app.get("/config")
+async def get_config():
+    """Get the current certificate configuration."""
+    return {
+        "cert_validity_days": config.cert_validity_days,
+        "ca_validity_days": config.ca_validity_days,
+        "key_size": config.key_size,
+        "country": config.country,
+        "state_province": config.state_province,
+        "locality": config.locality,
+        "organization": config.organization,
+        "ca_common_name": config.ca_common_name
+    }
+
 @app.get("/")
 async def root():
     """Root endpoint with service information."""
@@ -371,7 +406,8 @@ async def root():
             "create_certificate": "POST /certs/{username}",
             "revoke_certificate": "POST /revoke/{username}",
             "get_crl": "GET /crl.pem",
-            "download_pfx": "GET /certs/{username}/pfx"
+            "download_pfx": "GET /certs/{username}/pfx",
+            "get_config": "GET /config"
         }
     }
 
