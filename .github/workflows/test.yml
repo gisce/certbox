@@ -35,7 +35,7 @@ jobs:
     
     - name: Run tests with pytest
       run: |
-        pytest test_api.py -v
+        pytest test_api.py test_cli.py -v
     
     - name: Test CLI entry point
       run: |
