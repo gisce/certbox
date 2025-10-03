@@ -37,11 +37,7 @@ docker run -p 8000:8000 \
 
 3. Or use Docker Compose:
 ```bash
-# Run just the certbox service
-docker compose up -d certbox
-
-# Run with nginx example (requires server certificates)
-docker compose --profile nginx up -d
+docker compose up -d
 ```
 
 The service will be available at `http://localhost:8000`.
@@ -93,7 +89,7 @@ When using Docker, these directories are mounted as persistent volumes:
 - `certbox_clients` - Contains PFX files for browser installation
 - `certbox_requests` - Contains certificate signing requests
 
-These volumes ensure data persistence across container restarts and enable nginx to access the certificate files for mTLS authentication.
+These volumes ensure data persistence across container restarts.
 
 ## API Endpoints
 
@@ -155,27 +151,6 @@ curl -O http://localhost:8000/crl.pem
 
 ## Nginx mTLS Configuration
 
-### Docker Setup for Nginx Integration
-
-When using Docker, the certificate files are automatically available to nginx through shared volumes:
-
-```yaml
-# docker-compose.yml excerpt showing nginx integration
-nginx:
-  image: nginx:alpine
-  ports:
-    - "443:443"
-  volumes:
-    # Mount certificate directories from certbox service
-    - certbox_ca:/etc/nginx/certs/ca:ro
-    - certbox_crts:/etc/nginx/certs/crts:ro
-    - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  depends_on:
-    - certbox
-```
-
-### Nginx Configuration
-
 To use the generated certificates and CRL with Nginx for mutual TLS authentication:
 
 ```nginx
@@ -183,18 +158,18 @@ server {
     listen 443 ssl;
     server_name example.com;
     
-    # Server certificate (you need to provide these)
-    ssl_certificate /etc/ssl/certs/server.crt;
-    ssl_certificate_key /etc/ssl/private/server.key;
+    # Server certificate
+    ssl_certificate /path/to/server.crt;
+    ssl_certificate_key /path/to/server.key;
     
-    # Client certificate verification using Certbox CA
-    ssl_client_certificate /etc/nginx/certs/ca/ca.crt;
+    # Client certificate verification
+    ssl_client_certificate /path/to/certbox/ca/ca.crt;
     ssl_verify_client on;
-    ssl_crl /etc/nginx/certs/ca/crl.pem;
+    ssl_crl /path/to/certbox/ca/crl.pem;
     
     location / {
-        # Proxy to Certbox API
-        proxy_pass http://certbox:8000;
+        # Your application
+        proxy_pass http://backend;
         
         # Pass client certificate info to backend
         proxy_set_header X-Client-DN $ssl_client_s_dn;
@@ -202,8 +177,6 @@ server {
     }
 }
 ```
-
-**Note**: For the nginx example to work, you need to provide your own server certificate and key files.
 
 ## Testing
 
