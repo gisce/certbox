@@ -185,11 +185,27 @@ server {
 
 ## Testing
 
-Run the included test suite:
+Run the included test suite with pytest:
 
 ```bash
+# Install testing dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest test_api.py -v
+
+# Or run with the original method (deprecated)
 python test_api.py
 ```
+
+The test suite includes:
+- API endpoint testing
+- Configuration validation
+- Certificate manager functionality
+- Python version compatibility checks
+- Integration tests with mocked dependencies
+
+Tests are also run automatically via GitHub Actions on Python 3.8, 3.9, 3.10, 3.11, and 3.12.
 
 ## Configuration
 
