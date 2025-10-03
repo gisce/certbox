@@ -124,7 +124,7 @@ class TestAPIIntegration:
         from certbox.api.routes import create_certificate
         import asyncio
         
-        result = asyncio.run(create_certificate("test_user"))
+        result = asyncio.run(create_certificate("test_user", authenticated=True))
         assert result["username"] == "test_user"
         assert "serial_number" in result
         mock_cert_manager.create_client_certificate.assert_called_once_with("test_user")
@@ -134,10 +134,19 @@ class TestAPIIntegration:
         from certbox.api.routes import revoke_certificate
         import asyncio
         
-        result = asyncio.run(revoke_certificate("test_user"))
+        result = asyncio.run(revoke_certificate("test_user", authenticated=True))
         assert result["username"] == "test_user"
         assert result["status"] == "revoked"
         mock_cert_manager.revoke_certificate.assert_called_once_with("test_user")
+
+    def test_authentication_integration(self):
+        """Test that authentication module integrates properly."""
+        from certbox.auth import verify_token
+        import asyncio
+        
+        # Test that authentication can be called
+        result = asyncio.run(verify_token(None))
+        assert result is True  # Should be True when no token is configured
 
 
 if __name__ == "__main__":

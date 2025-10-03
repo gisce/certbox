@@ -2,11 +2,12 @@
 API route definitions for Certbox.
 """
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Depends
 from fastapi.responses import FileResponse
 
 from ..core import CertificateManager
 from ..config import config
+from ..auth import verify_token
 
 # Initialize certificate manager
 cert_manager = CertificateManager()
@@ -16,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("/certs/{username}")
-async def create_certificate(username: str):
+async def create_certificate(username: str, authenticated: bool = Depends(verify_token)):
     """Create a new client certificate for the specified user."""
     try:
         result = cert_manager.create_client_certificate(username)
@@ -28,7 +29,7 @@ async def create_certificate(username: str):
 
 
 @router.post("/revoke/{username}")
-async def revoke_certificate(username: str):
+async def revoke_certificate(username: str, authenticated: bool = Depends(verify_token)):
     """Revoke a client certificate for the specified user."""
     try:
         result = cert_manager.revoke_certificate(username)
@@ -54,7 +55,7 @@ async def get_crl():
 
 
 @router.get("/certs/{username}/pfx")
-async def download_pfx(username: str):
+async def download_pfx(username: str, authenticated: bool = Depends(verify_token)):
     """Download the PFX file for a user's certificate."""
     # Get directories for the default configuration
     from ..config import get_directories

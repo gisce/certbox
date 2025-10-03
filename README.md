@@ -375,7 +375,11 @@ Certbox provides both **REST API** and **CLI** interfaces. Choose the method tha
 
 #### Create a certificate
 ```bash
+# Without authentication (when CERTBOX_API_TOKEN is not set)
 curl -X POST http://localhost:8000/certs/alice
+
+# With authentication (when CERTBOX_API_TOKEN is configured)
+curl -X POST -H "Authorization: Bearer your-secret-token" http://localhost:8000/certs/alice
 ```
 
 Response:
@@ -393,12 +397,20 @@ Response:
 
 #### Download PFX file for browser installation
 ```bash
+# Without authentication (when CERTBOX_API_TOKEN is not set)
 curl -O -J http://localhost:8000/certs/alice/pfx
+
+# With authentication (when CERTBOX_API_TOKEN is configured)
+curl -O -J -H "Authorization: Bearer your-secret-token" http://localhost:8000/certs/alice/pfx
 ```
 
 #### Revoke a certificate
 ```bash
+# Without authentication (when CERTBOX_API_TOKEN is not set)
 curl -X POST http://localhost:8000/revoke/alice
+
+# With authentication (when CERTBOX_API_TOKEN is configured)
+curl -X POST -H "Authorization: Bearer your-secret-token" http://localhost:8000/revoke/alice
 ```
 
 Response:
@@ -517,6 +529,19 @@ The service can be configured using environment variables or a `.env` file. All 
 - `CERTBOX_CA_VALIDITY_DAYS` - CA certificate validity in days (default: 3650)
 - `CERTBOX_KEY_SIZE` - RSA key size in bits (default: 2048)
 
+### API Authentication
+- `CERTBOX_API_TOKEN` - API authentication token (default: "" - authentication disabled)
+
+When `CERTBOX_API_TOKEN` is set, the following endpoints require authentication:
+- `POST /certs/{username}` - Create certificate
+- `POST /revoke/{username}` - Revoke certificate  
+- `GET /certs/{username}/pfx` - Download PFX file
+
+Public endpoints (no authentication required):
+- `GET /` - Service information
+- `GET /config` - Configuration view
+- `GET /crl.pem` - Certificate revocation list
+
 ### Certificate Subject Information
 - `CERTBOX_COUNTRY` - Country code (default: "ES")
 - `CERTBOX_STATE_PROVINCE` - State or province (default: "Catalonia")
@@ -533,11 +558,12 @@ When `CERTBOX_ROOT_DIR` is set, all certificate directories (`ca/`, `crts/`, `pr
 
 #### Method 1: Environment Variables
 ```bash
-# Run with custom configuration including custom root directory
+# Run with custom configuration including authentication
 CERTBOX_ORGANIZATION="My Company" \
 CERTBOX_LOCALITY="Barcelona" \
 CERTBOX_CERT_VALIDITY_DAYS=730 \
 CERTBOX_ROOT_DIR="/var/lib/certbox" \
+CERTBOX_API_TOKEN="my-secret-api-token" \
 python main.py
 ```
 

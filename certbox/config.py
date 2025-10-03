@@ -25,6 +25,9 @@ class CertConfig(BaseSettings):
     
     # Directory configuration
     root_dir: str = ""
+    
+    # API Authentication
+    api_token: str = ""
 
     class Config:
         env_prefix = "CERTBOX_"
