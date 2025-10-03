@@ -125,6 +125,26 @@ To use the CLI, install Certbox using one of the methods above. The `certbox` co
 
 ### Available Commands
 
+#### Global Options
+
+The CLI supports global options that affect all commands:
+
+```bash
+# Use a custom configuration file
+certbox --config /path/to/custom.env create alice
+
+# Show help
+certbox --help
+
+# Show version  
+certbox --version
+```
+
+**Global Options:**
+- `--config PATH` - Specify a custom configuration file (default: .env)
+- `--version` - Show version and exit
+- `--help` - Show help message
+
 #### Help and Version
 ```bash
 # Show help and available commands
@@ -249,6 +269,7 @@ The CLI respects the same environment variables as the API server. You can confi
 export CERTBOX_ORGANIZATION="My Company"
 export CERTBOX_LOCALITY="Barcelona"
 export CERTBOX_CERT_VALIDITY_DAYS=730
+export CERTBOX_ROOT_DIR="/var/lib/certbox"
 
 # Then use CLI commands
 certbox create alice
@@ -260,9 +281,23 @@ Or use a `.env` file in your working directory:
 # Create .env file
 echo "CERTBOX_ORGANIZATION=My Company" > .env
 echo "CERTBOX_CERT_VALIDITY_DAYS=730" >> .env
+echo "CERTBOX_ROOT_DIR=/var/lib/certbox" >> .env
 
 # CLI commands will use these settings
 certbox create alice
+```
+
+Or use a custom configuration file:
+```bash
+# Create a custom config file
+cat > prod.env << EOF
+CERTBOX_ROOT_DIR=/var/lib/certbox
+CERTBOX_ORGANIZATION=Production Company
+EOF
+
+# Use it with the --config option
+certbox --config prod.env create alice
+certbox --config prod.env config
 ```
 
 ### Method 2: Local Python (Legacy)
@@ -489,14 +524,20 @@ The service can be configured using environment variables or a `.env` file. All 
 - `CERTBOX_ORGANIZATION` - Organization name (default: "GISCE-TI")
 - `CERTBOX_CA_COMMON_NAME` - CA common name (default: "GISCE-TI CA")
 
+### Directory Configuration
+- `CERTBOX_ROOT_DIR` - Root directory for all certificate files (default: project directory)
+
+When `CERTBOX_ROOT_DIR` is set, all certificate directories (`ca/`, `crts/`, `private/`, `clients/`, `requests/`) will be created under this path instead of the project directory.
+
 ### Configuration Methods
 
 #### Method 1: Environment Variables
 ```bash
-# Run with custom configuration
+# Run with custom configuration including custom root directory
 CERTBOX_ORGANIZATION="My Company" \
 CERTBOX_LOCALITY="Barcelona" \
 CERTBOX_CERT_VALIDITY_DAYS=730 \
+CERTBOX_ROOT_DIR="/var/lib/certbox" \
 python main.py
 ```
 
@@ -513,6 +554,7 @@ CERTBOX_LOCALITY=Barcelona
 CERTBOX_ORGANIZATION=My Company
 CERTBOX_CA_COMMON_NAME=My Company CA
 CERTBOX_KEY_SIZE=4096
+CERTBOX_ROOT_DIR=/var/lib/certbox
 ```
 
 Or copy and modify the example file:
@@ -528,14 +570,38 @@ python main.py
 
 **Note:** Environment variables take precedence over .env file values.
 
+#### Method 3: Custom Configuration File
+You can specify a custom configuration file using the CLI `--config` option:
+
+```bash
+# Create a custom config file
+cat > /etc/certbox/production.env << EOF
+CERTBOX_ROOT_DIR=/var/lib/certbox
+CERTBOX_ORGANIZATION=Production Company
+CERTBOX_CERT_VALIDITY_DAYS=365
+CERTBOX_CA_VALIDITY_DAYS=3650
+EOF
+
+# Use the custom config file with CLI
+certbox --config /etc/certbox/production.env create alice
+certbox --config /etc/certbox/production.env config
+```
+
+This method is particularly useful for:
+- Production deployments with specific configurations
+- Multiple environments (dev, staging, production)
+- Shared team configurations
+- System-wide installations
+
 ### Example Usage
 
 **Using environment variables:**
 ```bash
-# Run with custom configuration
+# Run with custom configuration including custom storage location
 CERTBOX_ORGANIZATION="My Company" \
 CERTBOX_LOCALITY="Barcelona" \
 CERTBOX_CERT_VALIDITY_DAYS=730 \
+CERTBOX_ROOT_DIR="/var/lib/certbox" \
 python main.py
 ```
 
@@ -545,9 +611,23 @@ python main.py
 echo "CERTBOX_ORGANIZATION=My Company" > .env
 echo "CERTBOX_LOCALITY=Barcelona" >> .env
 echo "CERTBOX_CERT_VALIDITY_DAYS=730" >> .env
+echo "CERTBOX_ROOT_DIR=/var/lib/certbox" >> .env
 
 # Run the service
 python main.py
+```
+
+**Using custom config file with CLI:**
+```bash
+# Create a custom configuration file
+cat > custom.env << EOF
+CERTBOX_ROOT_DIR=/tmp/test_certs
+CERTBOX_ORGANIZATION=Test Company
+EOF
+
+# Use custom config with CLI commands
+certbox --config custom.env create testuser
+certbox --config custom.env config
 ```
 
 ### Configuration Endpoint
@@ -568,6 +648,21 @@ Response:
     "locality": "Girona",
     "organization": "GISCE-TI",
     "ca_common_name": "GISCE-TI CA"
+}
+```
+
+**Note:** When `CERTBOX_ROOT_DIR` is configured, the response will also include:
+```json
+{
+    "cert_validity_days": 365,
+    "ca_validity_days": 3650,
+    "key_size": 2048,
+    "country": "ES",
+    "state_province": "Catalonia",
+    "locality": "Girona",
+    "organization": "GISCE-TI",
+    "ca_common_name": "GISCE-TI CA",
+    "root_dir": "/var/lib/certbox"
 }
 ```
 
