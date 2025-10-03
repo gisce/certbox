@@ -15,6 +15,8 @@ Certbox is a lightweight REST API for managing client X.509 certificates using a
 
 ## Installation
 
+Certbox can be used both as a **REST API service** and as a **command-line tool**. Choose the installation method that best fits your use case.
+
 ### Method 1: Docker (Recommended)
 
 1. Clone the repository:
@@ -44,7 +46,206 @@ docker compose up -d
 
 The service will be available at `http://localhost:8000`.
 
-### Method 2: Local Python
+### Method 2: Local Python Installation
+
+#### Option A: Install from source
+```bash
+# Clone the repository
+git clone https://github.com/gisce/certbox.git
+cd certbox
+
+# Install the package
+pip install -e .
+```
+
+#### Option B: Install from PyPI (when available)
+```bash
+pip install certbox
+```
+
+Once installed, you can use Certbox in multiple ways:
+
+#### As a CLI tool:
+```bash
+# Check version and available commands
+certbox --help
+
+# Create a certificate
+certbox create alice
+
+# Start the API server
+certbox api --host 0.0.0.0 --port 8000
+```
+
+#### As a Python module:
+```bash
+# Run the API server
+python -m certbox api
+
+# Use CLI commands
+python -m certbox create alice
+```
+
+#### As a traditional Python script:
+```bash
+# Install dependencies first
+pip install -r requirements.txt
+
+# Run the API server
+python main.py
+```
+
+## CLI Usage
+
+Certbox provides a comprehensive command-line interface for certificate management operations. The CLI offers the same functionality as the REST API but can be used directly from the command line.
+
+### Installation for CLI Usage
+
+To use the CLI, install Certbox using one of the methods above. The `certbox` command will be available system-wide after installation.
+
+### Available Commands
+
+#### Help and Version
+```bash
+# Show help and available commands
+certbox --help
+
+# Show version
+certbox --version
+```
+
+#### Certificate Management
+
+**Create a client certificate:**
+```bash
+certbox create <username>
+```
+
+Example:
+```bash
+certbox create alice
+```
+
+Output:
+```
+✓ Certificate created successfully for user: alice
+  Serial number: 12345678901234567890
+  Valid from: 2023-10-03T08:12:29
+  Valid until: 2024-10-03T08:12:29
+  Certificate: /path/to/crts/alice.crt
+  Private key: /path/to/private/alice.key
+  PFX file: /path/to/clients/alice.pfx
+```
+
+**Revoke a client certificate:**
+```bash
+certbox revoke <username>
+```
+
+Example:
+```bash
+certbox revoke alice
+```
+
+Output:
+```
+✓ Certificate revoked successfully for user: alice
+  Serial number: 12345678901234567890
+  Revoked at: 2023-10-03T08:15:00.123456
+  Status: revoked
+```
+
+#### Certificate Revocation List (CRL)
+
+**Get the current CRL:**
+```bash
+certbox crl
+```
+
+You can redirect the output to save the CRL to a file:
+```bash
+certbox crl > crl.pem
+```
+
+#### Configuration
+
+**View current configuration:**
+```bash
+certbox config
+```
+
+Output:
+```
+Current Certbox Configuration:
+  Certificate validity: 365 days
+  CA validity: 3650 days
+  Key size: 2048 bits
+  Country: ES
+  State/Province: Catalonia
+  Locality: Girona
+  Organization: GISCE-TI
+  CA Common Name: GISCE-TI CA
+```
+
+#### API Server
+
+**Start the API server:**
+```bash
+certbox api [OPTIONS]
+```
+
+Options:
+- `--host TEXT`: Host to bind the API server to (default: 0.0.0.0)
+- `--port INTEGER`: Port to bind the API server to (default: 8000)
+
+Examples:
+```bash
+# Start with default settings (0.0.0.0:8000)
+certbox api
+
+# Start on specific host and port
+certbox api --host localhost --port 9000
+
+# Start on all interfaces, port 8080
+certbox api --host 0.0.0.0 --port 8080
+```
+
+### CLI vs API Comparison
+
+| Operation | CLI Command | API Endpoint |
+|-----------|-------------|--------------|
+| Create certificate | `certbox create alice` | `POST /certs/alice` |
+| Revoke certificate | `certbox revoke alice` | `POST /revoke/alice` |
+| Get CRL | `certbox crl` | `GET /crl.pem` |
+| View config | `certbox config` | `GET /config` |
+| Start server | `certbox api` | N/A |
+
+### Environment Configuration for CLI
+
+The CLI respects the same environment variables as the API server. You can configure Certbox behavior using:
+
+```bash
+# Set custom configuration for CLI operations
+export CERTBOX_ORGANIZATION="My Company"
+export CERTBOX_LOCALITY="Barcelona" 
+export CERTBOX_CERT_VALIDITY_DAYS=730
+
+# Then use CLI commands
+certbox create alice
+certbox config  # Will show your custom settings
+```
+
+Or use a `.env` file in your working directory:
+```bash
+# Create .env file
+echo "CERTBOX_ORGANIZATION=My Company" > .env
+echo "CERTBOX_CERT_VALIDITY_DAYS=730" >> .env
+
+# CLI commands will use these settings
+certbox create alice
+```
+
+### Method 2: Local Python (Legacy)
 
 1. Clone the repository:
 ```bash
@@ -63,6 +264,8 @@ python main.py
 ```
 
 The service will start on `http://localhost:8000` and automatically create a CA if one doesn't exist.
+
+**Note:** This method only provides the API server. For CLI functionality, use Method 2 installation options above.
 
 ## Directory Structure
 
@@ -111,7 +314,11 @@ These volumes ensure data persistence across container restarts.
 
 ## Usage Examples
 
-### Create a certificate
+Certbox provides both **REST API** and **CLI** interfaces. Choose the method that works best for your workflow.
+
+### API Examples
+
+#### Create a certificate
 ```bash
 curl -X POST http://localhost:8000/certs/alice
 ```
@@ -129,12 +336,12 @@ Response:
 }
 ```
 
-### Download PFX file for browser installation
+#### Download PFX file for browser installation
 ```bash
 curl -O -J http://localhost:8000/certs/alice/pfx
 ```
 
-### Revoke a certificate
+#### Revoke a certificate
 ```bash
 curl -X POST http://localhost:8000/revoke/alice
 ```
@@ -149,9 +356,41 @@ Response:
 }
 ```
 
-### Download CRL for Nginx configuration
+#### Download CRL for Nginx configuration
 ```bash
 curl -O http://localhost:8000/crl.pem
+```
+
+### CLI Examples
+
+The CLI provides the same functionality with a more direct interface:
+
+#### Create a certificate
+```bash
+certbox create alice
+```
+
+#### Revoke a certificate
+```bash
+certbox revoke alice
+```
+
+#### Get CRL (output to stdout)
+```bash
+certbox crl
+
+# Save to file
+certbox crl > crl.pem
+```
+
+#### View configuration
+```bash
+certbox config
+```
+
+#### Start API server
+```bash
+certbox api --host 0.0.0.0 --port 8000
 ```
 
 ## Nginx mTLS Configuration
