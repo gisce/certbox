@@ -10,5 +10,6 @@ __email__ = "devel@gisce.net"
 from .app import app
 from .config import config
 from .core import CertificateManager
+from .cli import cli
 
-__all__ = ["app", "config", "CertificateManager", "__version__"]
+__all__ = ["app", "config", "CertificateManager", "cli", "__version__"]

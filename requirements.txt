@@ -4,3 +4,4 @@ cryptography==44.0.1
 python-multipart==0.0.18
 requests==2.32.4
 pydantic-settings==2.11.0
+click==8.1.7
