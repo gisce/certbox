@@ -102,6 +102,64 @@ class TestCertboxCLI:
         assert code != 0, "Revoke non-existent should fail"
         assert "not found" in stderr
 
+    def test_cli_certificate_renew(self):
+        """Test CLI certificate renewal."""
+        username = f"test_renew_{int(time.time())}"
+        
+        # First create a certificate
+        code, stdout, stderr = self.run_command(f"certbox create {username}")
+        assert code == 0, f"Create command failed: {stderr}"
+        
+        # Extract original serial number
+        original_serial = None
+        for line in stdout.split('\n'):
+            if "Serial number:" in line:
+                original_serial = line.split(":")[1].strip()
+                break
+        
+        # Then renew it
+        code, stdout, stderr = self.run_command(f"certbox renew {username}")
+        assert code == 0, f"Renew command failed: {stderr}"
+        assert "Certificate renewed successfully" in stdout
+        assert "New serial number:" in stdout
+        assert "Valid from:" in stdout
+        assert "Valid until:" in stdout
+        assert "Certificate:" in stdout
+        assert "Private key:" in stdout
+        assert "PFX file:" in stdout
+        assert "Old certificate revoked" in stdout
+        
+        # Extract new serial number and verify it's different
+        new_serial = None
+        for line in stdout.split('\n'):
+            if "New serial number:" in line:
+                new_serial = line.split(":")[1].strip()
+                break
+        
+        assert new_serial != original_serial, "New certificate should have different serial"
+
+    def test_cli_certificate_renew_keep_old(self):
+        """Test CLI certificate renewal with keep-old flag."""
+        username = f"test_renew_keep_{int(time.time())}"
+        
+        # First create a certificate
+        code, stdout, stderr = self.run_command(f"certbox create {username}")
+        assert code == 0, f"Create command failed: {stderr}"
+        
+        # Then renew it with keep-old flag
+        code, stdout, stderr = self.run_command(f"certbox renew {username} --keep-old")
+        assert code == 0, f"Renew with keep-old command failed: {stderr}"
+        assert "Certificate renewed successfully" in stdout
+        assert "Old certificate kept active" in stdout
+
+    def test_cli_certificate_renew_nonexistent(self):
+        """Test CLI certificate renewal of non-existent certificate."""
+        username = f"nonexistent_renew_{int(time.time())}"
+        
+        code, stdout, stderr = self.run_command(f"certbox renew {username}")
+        assert code != 0, "Renew non-existent should fail"
+        assert "not found" in stderr
+
     def test_cli_crl(self):
         """Test CLI CRL command."""
         code, stdout, stderr = self.run_command("certbox crl")
@@ -149,7 +207,7 @@ class TestCLIModuleIntegration:
     def test_cli_uses_certificate_manager_directly(self):
         """Test that CLI commands use CertificateManager directly."""
         # This is a design test to ensure CLI bypasses API
-        from certbox.cli import create, revoke
+        from certbox.cli import create, revoke, renew
         import click.testing
         
         runner = click.testing.CliRunner()

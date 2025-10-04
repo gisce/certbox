@@ -224,8 +224,8 @@ class CertificateManager:
         return {
             "username": username,
             "serial_number": str(client_cert.serial_number),
-            "valid_from": client_cert.not_valid_before.isoformat(),
-            "valid_until": client_cert.not_valid_after.isoformat(),
+            "valid_from": client_cert.not_valid_before_utc.isoformat(),
+            "valid_until": client_cert.not_valid_after_utc.isoformat(),
             "certificate_path": str(cert_path),
             "private_key_path": str(key_path),
             "pfx_path": str(pfx_path)
@@ -253,6 +253,129 @@ class CertificateManager:
             "serial_number": str(cert.serial_number),
             "revoked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "status": "revoked"
+        }
+    
+    def renew_certificate(self, username: str, revoke_old: bool = True) -> Dict[str, Any]:
+        """Renew a client certificate for the given username.
+        
+        Args:
+            username: The username for which to renew the certificate
+            revoke_old: Whether to revoke the old certificate (default: True)
+            
+        Returns:
+            Dict containing certificate information
+        """
+        # Check if certificate exists
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
+        key_path = self.directories['private_dir'] / f"{username}.key"
+        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
+        
+        if not cert_path.exists():
+            raise HTTPException(status_code=404, detail=f"Certificate for user '{username}' not found")
+        
+        old_serial = None
+        if revoke_old:
+            # Load the old certificate to get its serial number
+            with open(cert_path, "rb") as f:
+                old_cert = x509.load_pem_x509_certificate(f.read())
+            old_serial = old_cert.serial_number
+        
+        # Load CA
+        ca_cert, ca_key = self._load_ca()
+        
+        # Generate client private key
+        client_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=self.config.key_size,
+        )
+        
+        # Create client certificate
+        subject = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, self.config.country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, self.config.state_province),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, self.config.locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.config.organization),
+            x509.NameAttribute(NameOID.COMMON_NAME, username),
+        ])
+        
+        client_cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            ca_cert.subject
+        ).public_key(
+            client_key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.now(datetime.timezone.utc)
+        ).not_valid_after(
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=self.config.cert_validity_days)
+        ).add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(client_key.public_key()),
+            critical=False,
+        ).add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            critical=False,
+        ).add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        ).add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_encipherment=True,
+                key_cert_sign=False,
+                crl_sign=False,
+                key_agreement=False,
+                data_encipherment=False,
+                content_commitment=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        ).add_extension(
+            x509.ExtendedKeyUsage([
+                x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+            ]),
+            critical=True,
+        ).sign(ca_key, hashes.SHA256())
+        
+        # Save client certificate and key (overwriting existing files)
+        with open(cert_path, "wb") as f:
+            f.write(client_cert.public_bytes(serialization.Encoding.PEM))
+        
+        with open(key_path, "wb") as f:
+            f.write(client_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+        
+        # Create PFX file for browser installation
+        pfx_data = pkcs12.serialize_key_and_certificates(
+            name=username.encode('utf-8'),
+            key=client_key,
+            cert=client_cert,
+            cas=[ca_cert],
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        
+        with open(pfx_path, "wb") as f:
+            f.write(pfx_data)
+        
+        # Revoke old certificate if requested
+        if revoke_old and old_serial:
+            self._add_revoked_serial(old_serial)
+            self._generate_crl()
+        
+        return {
+            "username": username,
+            "serial_number": str(client_cert.serial_number),
+            "valid_from": client_cert.not_valid_before_utc.isoformat(),
+            "valid_until": client_cert.not_valid_after_utc.isoformat(),
+            "certificate_path": str(cert_path),
+            "private_key_path": str(key_path),
+            "pfx_path": str(pfx_path),
+            "old_serial_revoked": str(old_serial) if revoke_old and old_serial else None
         }
     
     def _generate_crl(self):
