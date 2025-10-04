@@ -498,16 +498,16 @@ Run the included test suite with pytest:
 pip install -r requirements-dev.txt
 
 # Run API tests
-pytest test_api.py -v
+pytest tests/test_api.py -v
 
 # Run CLI tests
-pytest test_cli.py -v
+pytest tests/test_cli.py -v
 
 # Run all tests
-pytest -v
+pytest tests/ -v
 
 # Or run with the original method (deprecated)
-python test_api.py
+python tests/test_api.py
 ```
 
 The test suite includes:

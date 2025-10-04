@@ -14,7 +14,7 @@ RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted
 # Copy application code
 COPY main.py .
 COPY run.py .
-COPY test_api.py .
+COPY tests/ ./tests/
 COPY certbox/ ./certbox/
 
 # Create directories for certificates and ensure proper permissions
