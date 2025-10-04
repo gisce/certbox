@@ -29,7 +29,7 @@ jobs:
     
     - name: Run tests with pytest
       run: |
-        pytest test_api.py test_cli.py -v
+        pytest tests/ -v
     
     - name: Test application startup (dry run)
       run: |
