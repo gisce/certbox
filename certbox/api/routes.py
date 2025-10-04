@@ -40,6 +40,18 @@ async def revoke_certificate(username: str, authenticated: bool = Depends(verify
         raise HTTPException(status_code=500, detail=f"Failed to revoke certificate: {str(e)}")
 
 
+@router.post("/renew/{username}")
+async def renew_certificate(username: str, keep_old: bool = False, authenticated: bool = Depends(verify_token)):
+    """Renew a client certificate for the specified user."""
+    try:
+        result = cert_manager.renew_certificate(username, revoke_old=not keep_old)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to renew certificate: {str(e)}")
+
+
 @router.get("/crl.pem")
 async def get_crl():
     """Get the Certificate Revocation List in PEM format."""
@@ -103,6 +115,7 @@ async def root():
         "endpoints": {
             "create_certificate": "POST /certs/{username}",
             "revoke_certificate": "POST /revoke/{username}",
+            "renew_certificate": "POST /renew/{username}",
             "get_crl": "GET /crl.pem",
             "download_pfx": "GET /certs/{username}/pfx",
             "get_config": "GET /config"

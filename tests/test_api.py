@@ -116,6 +116,11 @@ class TestAPIIntegration:
                 "username": "test_user", 
                 "status": "revoked"
             }
+            mock.renew_certificate.return_value = {
+                "username": "test_user",
+                "serial_number": "67890",
+                "old_serial_revoked": "12345"
+            }
             mock.get_crl.return_value = b"-----BEGIN X509 CRL-----\ntest_data\n-----END X509 CRL-----"
             yield mock
     
@@ -138,6 +143,22 @@ class TestAPIIntegration:
         assert result["username"] == "test_user"
         assert result["status"] == "revoked"
         mock_cert_manager.revoke_certificate.assert_called_once_with("test_user")
+
+    def test_certificate_renewal_logic(self, mock_cert_manager):
+        """Test certificate renewal logic."""
+        from certbox.api.routes import renew_certificate
+        import asyncio
+        
+        # Test renewal with revoke old (default)
+        result = asyncio.run(renew_certificate("test_user", keep_old=False, authenticated=True))
+        assert result["username"] == "test_user"
+        assert "serial_number" in result
+        mock_cert_manager.renew_certificate.assert_called_once_with("test_user", revoke_old=True)
+        
+        # Reset mock and test keep old
+        mock_cert_manager.reset_mock()
+        result = asyncio.run(renew_certificate("test_user", keep_old=True, authenticated=True))
+        mock_cert_manager.renew_certificate.assert_called_once_with("test_user", revoke_old=False)
 
     def test_authentication_integration(self):
         """Test that authentication module integrates properly."""

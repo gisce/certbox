@@ -129,16 +129,8 @@ class CertificateManager:
             for serial in sorted(revoked_serials):
                 f.write(f"{serial}\n")
     
-    def create_client_certificate(self, username: str) -> Dict[str, Any]:
-        """Create a client certificate for the given username."""
-        # Check if certificate already exists
-        cert_path = self.directories['crts_dir'] / f"{username}.crt"
-        key_path = self.directories['private_dir'] / f"{username}.key"
-        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
-        
-        if cert_path.exists():
-            raise HTTPException(status_code=409, detail=f"Certificate for user '{username}' already exists")
-        
+    def _generate_and_save_certificate(self, username: str, cert_path: Path, key_path: Path, pfx_path: Path) -> x509.Certificate:
+        """Generate and save a client certificate and private key."""
         # Load CA
         ca_cert, ca_key = self._load_ca()
         
@@ -221,11 +213,25 @@ class CertificateManager:
         with open(pfx_path, "wb") as f:
             f.write(pfx_data)
         
+        return client_cert
+
+    def create_client_certificate(self, username: str) -> Dict[str, Any]:
+        """Create a client certificate for the given username."""
+        # Check if certificate already exists
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
+        key_path = self.directories['private_dir'] / f"{username}.key"
+        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
+        
+        if cert_path.exists():
+            raise HTTPException(status_code=409, detail=f"Certificate for user '{username}' already exists")
+        
+        client_cert = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
+        
         return {
             "username": username,
             "serial_number": str(client_cert.serial_number),
-            "valid_from": client_cert.not_valid_before.isoformat(),
-            "valid_until": client_cert.not_valid_after.isoformat(),
+            "valid_from": client_cert.not_valid_before_utc.isoformat(),
+            "valid_until": client_cert.not_valid_after_utc.isoformat(),
             "certificate_path": str(cert_path),
             "private_key_path": str(key_path),
             "pfx_path": str(pfx_path)
@@ -253,6 +259,50 @@ class CertificateManager:
             "serial_number": str(cert.serial_number),
             "revoked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "status": "revoked"
+        }
+    
+    def renew_certificate(self, username: str, revoke_old: bool = True) -> Dict[str, Any]:
+        """Renew a client certificate for the given username.
+        
+        Args:
+            username: The username for which to renew the certificate
+            revoke_old: Whether to revoke the old certificate (default: True)
+            
+        Returns:
+            Dict containing certificate information
+        """
+        # Check if certificate exists
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
+        key_path = self.directories['private_dir'] / f"{username}.key"
+        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
+        
+        if not cert_path.exists():
+            raise HTTPException(status_code=404, detail=f"Certificate for user '{username}' not found")
+        
+        old_serial = None
+        if revoke_old:
+            # Load the old certificate to get its serial number
+            with open(cert_path, "rb") as f:
+                old_cert = x509.load_pem_x509_certificate(f.read())
+            old_serial = old_cert.serial_number
+        
+        # Generate and save new certificate (overwriting existing files)
+        client_cert = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
+        
+        # Revoke old certificate if requested
+        if revoke_old and old_serial:
+            self._add_revoked_serial(old_serial)
+            self._generate_crl()
+        
+        return {
+            "username": username,
+            "serial_number": str(client_cert.serial_number),
+            "valid_from": client_cert.not_valid_before_utc.isoformat(),
+            "valid_until": client_cert.not_valid_after_utc.isoformat(),
+            "certificate_path": str(cert_path),
+            "private_key_path": str(key_path),
+            "pfx_path": str(pfx_path),
+            "old_serial_revoked": str(old_serial) if revoke_old and old_serial else None
         }
     
     def _generate_crl(self):

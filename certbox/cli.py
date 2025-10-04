@@ -89,6 +89,36 @@ def revoke(username: str):
 
 
 @cli.command()
+@click.argument('username')
+@click.option('--keep-old', is_flag=True, default=False, help='Do not revoke the old certificate')
+def renew(username: str, keep_old: bool):
+    """Renew a client certificate for the specified username."""
+    try:
+        cert_manager = get_cert_manager()
+        result = cert_manager.renew_certificate(username, revoke_old=not keep_old)
+        
+        click.echo(f"✓ Certificate renewed successfully for user: {username}")
+        click.echo(f"  New serial number: {result['serial_number']}")
+        click.echo(f"  Valid from: {result['valid_from']}")
+        click.echo(f"  Valid until: {result['valid_until']}")
+        click.echo(f"  Certificate: {result['certificate_path']}")
+        click.echo(f"  Private key: {result['private_key_path']}")
+        click.echo(f"  PFX file: {result['pfx_path']}")
+        
+        if result.get('old_serial_revoked'):
+            click.echo(f"  Old certificate revoked (serial: {result['old_serial_revoked']})")
+        else:
+            click.echo("  Old certificate kept active")
+        
+    except HTTPException as e:
+        click.echo(f"❌ Error renewing certificate: {e.detail}", err=True)
+        raise click.ClickException(e.detail)
+    except Exception as e:
+        click.echo(f"❌ Error renewing certificate: {str(e)}", err=True)
+        raise click.ClickException(str(e))
+
+
+@cli.command()
 def config():
     """Show current Certbox configuration."""
     config_instance = current_config or certbox_config
