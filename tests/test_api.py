@@ -26,6 +26,7 @@ class TestCertboxAPI:
         assert "description" in result
         assert "version" in result
         assert "endpoints" in result
+        assert "get_certificate_info" in result["endpoints"]
     
     def test_config_endpoint_data(self):
         """Test configuration endpoint returns expected fields."""
@@ -122,6 +123,21 @@ class TestAPIIntegration:
                 "old_serial_revoked": "12345"
             }
             mock.get_crl.return_value = b"-----BEGIN X509 CRL-----\ntest_data\n-----END X509 CRL-----"
+            mock.get_certificate_info.return_value = {
+                "username": "test_user",
+                "serial_number": "12345",
+                "subject": {"common_name": "test_user"},
+                "issuer": {"common_name": "GISCE-TI CA"},
+                "valid_from": "2023-10-03T08:12:29",
+                "valid_until": "2024-10-03T08:12:29",
+                "status": "valid",
+                "is_revoked": False,
+                "certificate_path": "/path/to/cert.crt",
+                "private_key_path": "/path/to/key.key",
+                "pfx_path": "/path/to/cert.pfx",
+                "key_usage": {"digital_signature": True, "key_encipherment": True},
+                "extensions": {"basic_constraints": {"ca": False, "path_length": None}}
+            }
             yield mock
     
     def test_certificate_creation_logic(self, mock_cert_manager):
@@ -159,6 +175,21 @@ class TestAPIIntegration:
         mock_cert_manager.reset_mock()
         result = asyncio.run(renew_certificate("test_user", keep_old=True, authenticated=True))
         mock_cert_manager.renew_certificate.assert_called_once_with("test_user", revoke_old=False)
+
+    def test_certificate_info_logic(self, mock_cert_manager):
+        """Test certificate info retrieval logic."""
+        from certbox.api.routes import get_certificate_info
+        import asyncio
+        
+        result = asyncio.run(get_certificate_info("test_user", authenticated=True))
+        assert result["username"] == "test_user"
+        assert result["serial_number"] == "12345"
+        assert result["status"] == "valid"
+        assert "subject" in result
+        assert "issuer" in result
+        assert "key_usage" in result
+        assert "extensions" in result
+        mock_cert_manager.get_certificate_info.assert_called_once_with("test_user")
 
     def test_authentication_integration(self):
         """Test that authentication module integrates properly."""
