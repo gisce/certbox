@@ -256,6 +256,8 @@ certbox api --host 0.0.0.0 --port 8080
 |-----------|-------------|--------------|
 | Create certificate | `certbox create alice` | `POST /certs/alice` |
 | Revoke certificate | `certbox revoke alice` | `POST /revoke/alice` |
+| Renew certificate | `certbox renew alice` | `POST /renew/alice` |
+| Get certificate info | `certbox info alice` | `GET /certs/alice/info` |
 | Get CRL | `certbox crl` | `GET /crl.pem` |
 | View config | `certbox config` | `GET /config` |
 | Start server | `certbox api` | N/A |
@@ -359,6 +361,8 @@ These volumes ensure data persistence across container restarts.
 ### Certificate Management
 - **POST /certs/{username}** - Create a new client certificate
 - **POST /revoke/{username}** - Revoke a client certificate
+- **POST /renew/{username}** - Renew a client certificate
+- **GET /certs/{username}/info** - Get information about a certificate
 - **GET /certs/{username}/pfx** - Download PFX file for browser installation
 
 ### Certificate Revocation List
@@ -428,6 +432,59 @@ Response:
 curl -O http://localhost:8000/crl.pem
 ```
 
+#### Get certificate information
+```bash
+# Without authentication (when CERTBOX_API_TOKEN is not set)
+curl http://localhost:8000/certs/alice/info
+
+# With authentication (when CERTBOX_API_TOKEN is configured)
+curl -H "Authorization: Bearer your-secret-token" http://localhost:8000/certs/alice/info
+```
+
+Response:
+```json
+{
+    "username": "alice",
+    "serial_number": "12345678901234567890",
+    "status": "valid",
+    "valid_from": "2023-10-03T08:12:29+00:00",
+    "valid_until": "2024-10-03T08:12:29+00:00",
+    "is_revoked": false,
+    "subject": {
+        "country": "ES",
+        "state_province": "Catalonia",
+        "locality": "Girona",
+        "organization": "GISCE-TI",
+        "common_name": "alice"
+    },
+    "issuer": {
+        "organization": "GISCE-TI",
+        "common_name": "GISCE-TI CA"
+    },
+    "certificate_path": "/path/to/crts/alice.crt",
+    "private_key_path": "/path/to/private/alice.key",
+    "pfx_path": "/path/to/clients/alice.pfx",
+    "key_usage": {
+        "digital_signature": true,
+        "key_encipherment": true,
+        "key_agreement": false,
+        "key_cert_sign": false,
+        "crl_sign": false,
+        "content_commitment": false,
+        "data_encipherment": false
+    },
+    "extensions": {
+        "basic_constraints": {
+            "ca": false,
+            "path_length": null
+        },
+        "extended_key_usage": ["clientAuth"],
+        "subject_key_identifier": "a1b2c3d4e5f6...",
+        "authority_key_identifier": "f6e5d4c3b2a1..."
+    }
+}
+```
+
 ### CLI Examples
 
 The CLI provides the same functionality with a more direct interface:
@@ -440,6 +497,44 @@ certbox create alice
 #### Revoke a certificate
 ```bash
 certbox revoke alice
+```
+
+#### Get certificate information
+```bash
+certbox info alice
+```
+
+Output:
+```
+Certificate Information for user: alice
+  Serial number: 12345678901234567890
+  Status: valid
+  Valid from: 2023-10-03T08:12:29+00:00
+  Valid until: 2024-10-03T08:12:29+00:00
+  Is revoked: False
+  Subject:
+    Country: ES
+    State Province: Catalonia
+    Locality: Girona
+    Organization: GISCE-TI
+    Common Name: alice
+  Issuer:
+    Organization: GISCE-TI
+    Common Name: GISCE-TI CA
+  File paths:
+    Certificate: /path/to/crts/alice.crt
+    Private key: /path/to/private/alice.key
+    PFX file: /path/to/clients/alice.pfx
+  Key usage:
+    ✓ Digital Signature
+    ✓ Key Encipherment
+  Extensions:
+    Basic Constraints:
+      ca: False
+      path_length: None
+    Extended Key Usage: clientAuth
+    Subject Key Identifier: a1b2c3d4e5f6...
+    Authority Key Identifier: f6e5d4c3b2a1...
 ```
 
 #### Get CRL (output to stdout)
