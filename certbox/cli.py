@@ -119,6 +119,62 @@ def renew(username: str, keep_old: bool):
 
 
 @cli.command()
+@click.argument('username')
+def info(username: str):
+    """Get information about a certificate for the specified username."""
+    try:
+        cert_manager = get_cert_manager()
+        result = cert_manager.get_certificate_info(username)
+        
+        click.echo(f"Certificate Information for user: {username}")
+        click.echo(f"  Serial number: {result['serial_number']}")
+        click.echo(f"  Status: {result['status']}")
+        click.echo(f"  Valid from: {result['valid_from']}")
+        click.echo(f"  Valid until: {result['valid_until']}")
+        click.echo(f"  Is revoked: {result['is_revoked']}")
+        
+        click.echo("  Subject:")
+        for key, value in result['subject'].items():
+            click.echo(f"    {key.replace('_', ' ').title()}: {value}")
+        
+        click.echo("  Issuer:")
+        for key, value in result['issuer'].items():
+            click.echo(f"    {key.replace('_', ' ').title()}: {value}")
+        
+        click.echo("  File paths:")
+        click.echo(f"    Certificate: {result['certificate_path']}")
+        if result['private_key_path']:
+            click.echo(f"    Private key: {result['private_key_path']}")
+        if result['pfx_path']:
+            click.echo(f"    PFX file: {result['pfx_path']}")
+        
+        if result['key_usage']:
+            click.echo("  Key usage:")
+            for usage, enabled in result['key_usage'].items():
+                if enabled:
+                    click.echo(f"    ✓ {usage.replace('_', ' ').title()}")
+        
+        if result['extensions']:
+            click.echo("  Extensions:")
+            for ext_name, ext_value in result['extensions'].items():
+                if isinstance(ext_value, dict):
+                    click.echo(f"    {ext_name.replace('_', ' ').title()}:")
+                    for k, v in ext_value.items():
+                        click.echo(f"      {k}: {v}")
+                elif isinstance(ext_value, list):
+                    click.echo(f"    {ext_name.replace('_', ' ').title()}: {', '.join(ext_value)}")
+                else:
+                    click.echo(f"    {ext_name.replace('_', ' ').title()}: {ext_value}")
+        
+    except HTTPException as e:
+        click.echo(f"❌ Error getting certificate info: {e.detail}", err=True)
+        raise click.ClickException(e.detail)
+    except Exception as e:
+        click.echo(f"❌ Error getting certificate info: {str(e)}", err=True)
+        raise click.ClickException(str(e))
+
+
+@cli.command()
 def config():
     """Show current Certbox configuration."""
     config_instance = current_config or certbox_config

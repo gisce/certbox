@@ -339,3 +339,125 @@ class CertificateManager:
         
         with open(self.crl_path, "rb") as f:
             return f.read()
+    
+    def get_certificate_info(self, username: str) -> Dict[str, Any]:
+        """Get information about an existing certificate."""
+        cert_path = self.directories['crts_dir'] / f"{username}.crt"
+        key_path = self.directories['private_dir'] / f"{username}.key"
+        pfx_path = self.directories['clients_dir'] / f"{username}.pfx"
+        
+        if not cert_path.exists():
+            raise HTTPException(status_code=404, detail=f"Certificate for user '{username}' not found")
+        
+        # Load the certificate to get its information
+        with open(cert_path, "rb") as f:
+            cert = x509.load_pem_x509_certificate(f.read())
+        
+        # Check if certificate is revoked
+        revoked_serials = self._get_revoked_serials()
+        is_revoked = cert.serial_number in revoked_serials
+        
+        # Get subject information
+        subject_info = {}
+        for attribute in cert.subject:
+            if attribute.oid == NameOID.COMMON_NAME:
+                subject_info['common_name'] = attribute.value
+            elif attribute.oid == NameOID.ORGANIZATION_NAME:
+                subject_info['organization'] = attribute.value
+            elif attribute.oid == NameOID.COUNTRY_NAME:
+                subject_info['country'] = attribute.value
+            elif attribute.oid == NameOID.STATE_OR_PROVINCE_NAME:
+                subject_info['state_province'] = attribute.value
+            elif attribute.oid == NameOID.LOCALITY_NAME:
+                subject_info['locality'] = attribute.value
+        
+        # Get issuer information
+        issuer_info = {}
+        for attribute in cert.issuer:
+            if attribute.oid == NameOID.COMMON_NAME:
+                issuer_info['common_name'] = attribute.value
+            elif attribute.oid == NameOID.ORGANIZATION_NAME:
+                issuer_info['organization'] = attribute.value
+        
+        # Determine certificate status
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if is_revoked:
+            status = "revoked"
+        elif now < cert.not_valid_before_utc:
+            status = "not_yet_valid"
+        elif now > cert.not_valid_after_utc:
+            status = "expired"
+        else:
+            status = "valid"
+        
+        return {
+            "username": username,
+            "serial_number": str(cert.serial_number),
+            "subject": subject_info,
+            "issuer": issuer_info,
+            "valid_from": cert.not_valid_before_utc.isoformat(),
+            "valid_until": cert.not_valid_after_utc.isoformat(),
+            "status": status,
+            "is_revoked": is_revoked,
+            "certificate_path": str(cert_path),
+            "private_key_path": str(key_path) if key_path.exists() else None,
+            "pfx_path": str(pfx_path) if pfx_path.exists() else None,
+            "key_usage": self._get_key_usage_info(cert),
+            "extensions": self._get_extension_info(cert)
+        }
+    
+    def _get_key_usage_info(self, cert: x509.Certificate) -> Dict[str, bool]:
+        """Extract key usage information from certificate."""
+        try:
+            key_usage = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+            result = {
+                "digital_signature": key_usage.digital_signature,
+                "key_encipherment": key_usage.key_encipherment,
+                "key_agreement": key_usage.key_agreement,
+                "key_cert_sign": key_usage.key_cert_sign,
+                "crl_sign": key_usage.crl_sign,
+                "content_commitment": key_usage.content_commitment,
+                "data_encipherment": key_usage.data_encipherment,
+            }
+            
+            # These properties are only valid when key_agreement is True
+            if key_usage.key_agreement:
+                result["encipher_only"] = key_usage.encipher_only
+                result["decipher_only"] = key_usage.decipher_only
+            
+            return result
+        except x509.ExtensionNotFound:
+            return {}
+    
+    def _get_extension_info(self, cert: x509.Certificate) -> Dict[str, Any]:
+        """Extract extension information from certificate."""
+        extensions = {}
+        
+        try:
+            basic_constraints = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS).value
+            extensions["basic_constraints"] = {
+                "ca": basic_constraints.ca,
+                "path_length": basic_constraints.path_length
+            }
+        except x509.ExtensionNotFound:
+            pass
+        
+        try:
+            extended_key_usage = cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value
+            extensions["extended_key_usage"] = [eku._name for eku in extended_key_usage]
+        except x509.ExtensionNotFound:
+            pass
+        
+        try:
+            subject_key_id = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER).value
+            extensions["subject_key_identifier"] = subject_key_id.digest.hex()
+        except x509.ExtensionNotFound:
+            pass
+        
+        try:
+            authority_key_id = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER).value
+            extensions["authority_key_identifier"] = authority_key_id.key_identifier.hex() if authority_key_id.key_identifier else None
+        except x509.ExtensionNotFound:
+            pass
+        
+        return extensions

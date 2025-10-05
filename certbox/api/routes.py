@@ -66,6 +66,18 @@ async def get_crl():
         raise HTTPException(status_code=500, detail=f"Failed to get CRL: {str(e)}")
 
 
+@router.get("/certs/{username}/info")
+async def get_certificate_info(username: str, authenticated: bool = Depends(verify_token)):
+    """Get information about a certificate for the specified user."""
+    try:
+        result = cert_manager.get_certificate_info(username)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get certificate info: {str(e)}")
+
+
 @router.get("/certs/{username}/pfx")
 async def download_pfx(username: str, authenticated: bool = Depends(verify_token)):
     """Download the PFX file for a user's certificate."""
@@ -116,6 +128,7 @@ async def root():
             "create_certificate": "POST /certs/{username}",
             "revoke_certificate": "POST /revoke/{username}",
             "renew_certificate": "POST /renew/{username}",
+            "get_certificate_info": "GET /certs/{username}/info",
             "get_crl": "GET /crl.pem",
             "download_pfx": "GET /certs/{username}/pfx",
             "get_config": "GET /config"
