@@ -21,6 +21,7 @@ Certbox is a lightweight REST API for managing client X.509 certificates using a
   - [API Examples](#api-examples)
   - [CLI Examples](#cli-examples)
 - [Nginx mTLS Configuration](#nginx-mtls-configuration)
+- [Docker Compose with Nginx](#docker-compose-with-nginx)
 - [Testing](#testing)
 - [Configuration](#configuration)
 - [Security Notes](#security-notes)
@@ -66,7 +67,11 @@ docker run -p 8000:8000 \
 docker compose up -d
 ```
 
-The service will be available at `http://localhost:8000`.
+The services will be available at:
+- **Nginx proxy (HTTPS)**: `https://localhost:1443` (recommended for testing)
+- **Certbox backend (HTTP)**: `http://localhost:8068` (direct access)
+
+The nginx proxy provides SSL termination and can be used to test the complete application setup with HTTPS.
 
 ### Method 2: Local Python Installation
 
@@ -583,6 +588,71 @@ server {
     }
 }
 ```
+
+## Docker Compose with Nginx
+
+The included `docker-compose.yml` sets up a complete testing environment with nginx as a reverse proxy:
+
+### Architecture
+
+- **Certbox Backend**: Runs on internal port 8068
+- **Nginx Proxy**: Listens on HTTPS port 1443, proxies to Certbox backend
+- **SSL Termination**: Nginx handles SSL with automatically generated self-signed certificates
+
+### Services
+
+1. **certbox**: The main Certbox application
+   - Internal port: 8068
+   - Environment variables: `CERTBOX_HOST=0.0.0.0`, `CERTBOX_PORT=8068`
+
+2. **nginx**: Reverse proxy with SSL termination
+   - External port: 1443 (HTTPS)
+   - Automatically generates self-signed certificates for testing
+   - Includes health check endpoint at `/nginx-health`
+
+### Usage
+
+```bash
+# Start both services
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Access via nginx proxy (HTTPS)
+curl -k https://localhost:1443/
+
+# Access backend directly (HTTP)
+curl http://localhost:8068/
+
+# Stop services
+docker compose down
+```
+
+### Configuration Files
+
+- `nginx.conf`: Main nginx configuration with SSL and proxy settings
+- `nginx-init.sh`: Initialization script that generates SSL certificates
+- `docker-compose.yml`: Orchestrates both services with networking
+
+### Testing the Complete Setup
+
+The nginx proxy allows you to test the entire application with HTTPS:
+
+```bash
+# Test API endpoints through nginx
+curl -k https://localhost:1443/config
+curl -k https://localhost:1443/crl.pem
+
+# Test health endpoints
+curl -k https://localhost:1443/nginx-health
+```
+
+This setup is ideal for:
+- Testing the application with HTTPS
+- Simulating production-like environments
+- Testing SSL certificate verification workflows
+- Load balancing scenarios (when multiple backend instances are configured)
 
 ## Testing
 

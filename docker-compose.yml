@@ -3,7 +3,7 @@ services:
     build: .
     container_name: certbox
     ports:
-      - "8000:8000"
+      - "8068:8068"
     volumes:
       # Persist certificate data
       - certbox_ca:/app/ca
@@ -12,12 +12,44 @@ services:
       - certbox_clients:/app/clients
       - certbox_requests:/app/requests
     restart: unless-stopped
+    environment:
+      - CERTBOX_HOST=0.0.0.0
+      - CERTBOX_PORT=8068
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/', timeout=2)"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8068/', timeout=2)"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+    networks:
+      - certbox_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: certbox_nginx
+    ports:
+      - "1443:1443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-init.sh:/nginx-init.sh:ro
+      - nginx_ssl_certs:/etc/ssl/certs
+      - nginx_ssl_private:/etc/ssl/private
+    depends_on:
+      - certbox
+    restart: unless-stopped
+    networks:
+      - certbox_network
+    command: sh /nginx-init.sh
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-q", "--spider", "https://localhost:1443/nginx-health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+networks:
+  certbox_network:
+    driver: bridge
 
 volumes:
   certbox_ca:
@@ -29,4 +61,8 @@ volumes:
   certbox_clients:
     driver: local
   certbox_requests:
+    driver: local
+  nginx_ssl_certs:
+    driver: local
+  nginx_ssl_private:
     driver: local
