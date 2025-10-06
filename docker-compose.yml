@@ -3,7 +3,7 @@ services:
     build: .
     container_name: certbox
     ports:
-      - "8068:8068"
+      - "8000:8000"
     volumes:
       # Persist certificate data
       - certbox_ca:/app/ca
@@ -12,11 +12,8 @@ services:
       - certbox_clients:/app/clients
       - certbox_requests:/app/requests
     restart: unless-stopped
-    environment:
-      - CERTBOX_HOST=0.0.0.0
-      - CERTBOX_PORT=8068
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8068/', timeout=2)"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/', timeout=2)"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -24,6 +21,25 @@ services:
     networks:
       - certbox_network
 
+  # Mock backend service that will be protected by nginx mTLS
+  backend:
+    image: nginx:alpine
+    container_name: certbox_backend
+    ports:
+      - "8068:8068"
+    volumes:
+      - ./backend-nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    networks:
+      - certbox_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8068/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Nginx proxy with mTLS protection for the backend service
   nginx:
     image: nginx:alpine
     container_name: certbox_nginx
@@ -32,10 +48,12 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx-init.sh:/nginx-init.sh:ro
+      - certbox_ca:/etc/nginx/certs/ca:ro
       - nginx_ssl_certs:/etc/ssl/certs
       - nginx_ssl_private:/etc/ssl/private
     depends_on:
       - certbox
+      - backend
     restart: unless-stopped
     networks:
       - certbox_network
