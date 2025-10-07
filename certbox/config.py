@@ -28,6 +28,9 @@ class CertConfig(BaseSettings):
     
     # API Authentication
     api_token: str = ""
+    
+    # PFX password configuration
+    pfx_password_length: int = 12
 
     class Config:
         env_prefix = "CERTBOX_"

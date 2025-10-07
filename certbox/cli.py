@@ -58,6 +58,7 @@ def create(username: str):
         click.echo(f"  Certificate: {result['certificate_path']}")
         click.echo(f"  Private key: {result['private_key_path']}")
         click.echo(f"  PFX file: {result['pfx_path']}")
+        click.echo(f"  PFX password: {result['pfx_password']}")
         
     except HTTPException as e:
         click.echo(f"❌ Error creating certificate: {e.detail}", err=True)
@@ -104,6 +105,7 @@ def renew(username: str, keep_old: bool):
         click.echo(f"  Certificate: {result['certificate_path']}")
         click.echo(f"  Private key: {result['private_key_path']}")
         click.echo(f"  PFX file: {result['pfx_path']}")
+        click.echo(f"  PFX password: {result['pfx_password']}")
         
         if result.get('old_serial_revoked'):
             click.echo(f"  Old certificate revoked (serial: {result['old_serial_revoked']})")

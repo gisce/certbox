@@ -20,6 +20,7 @@ Certbox is a lightweight REST API for managing client X.509 certificates using a
 - [Usage Examples](#usage-examples)
   - [API Examples](#api-examples)
   - [CLI Examples](#cli-examples)
+- [Browser Certificate Import](#browser-certificate-import)
 - [Nginx mTLS Configuration](#nginx-mtls-configuration)
 - [Testing](#testing)
 - [Configuration](#configuration)
@@ -395,7 +396,8 @@ Response:
     "valid_until": "2024-10-03T08:12:29",
     "certificate_path": "/path/to/crts/alice.crt",
     "private_key_path": "/path/to/private/alice.key",
-    "pfx_path": "/path/to/clients/alice.pfx"
+    "pfx_path": "/path/to/clients/alice.pfx",
+    "pfx_password": "c^016iKp6vx0"
 }
 ```
 
@@ -407,6 +409,8 @@ curl -O -J http://localhost:8000/certs/alice/pfx
 # With authentication (when CERTBOX_API_TOKEN is configured)
 curl -O -J -H "Authorization: Bearer your-secret-token" http://localhost:8000/certs/alice/pfx
 ```
+
+**Note**: PFX files are password-protected for security. The password is provided in the response when creating or renewing certificates (see `pfx_password` field above). You'll need this password to import the PFX file into your browser.
 
 #### Revoke a certificate
 ```bash
@@ -555,6 +559,34 @@ certbox config
 certbox api --host 0.0.0.0 --port 8000
 ```
 
+## Browser Certificate Import
+
+### Importing PFX Files
+
+The generated PFX files are password-protected and can be imported into browsers for client certificate authentication:
+
+#### Chrome/Edge
+1. Go to Settings → Privacy and security → Security → Manage certificates
+2. Click "Import" in the Personal tab
+3. Select the downloaded `.pfx` file
+4. Enter the password provided in the API response (`pfx_password` field)
+5. Complete the import wizard
+
+#### Firefox
+1. Go to Settings → Privacy & Security → Certificates → View Certificates
+2. Click "Import" in the Your Certificates tab  
+3. Select the downloaded `.pfx` file
+4. Enter the password provided in the API response
+5. The certificate will be available for client authentication
+
+#### Safari (macOS)
+1. Double-click the downloaded `.pfx` file
+2. Enter the password when prompted
+3. Choose the keychain to import to (usually "login")
+4. The certificate will be available in Keychain Access and Safari
+
+**Important**: Keep the password secure as it protects your private key. The password is only provided when creating or renewing certificates.
+
 ## Nginx mTLS Configuration
 
 To use the generated certificates and CRL with Nginx for mutual TLS authentication:
@@ -623,6 +655,7 @@ The service can be configured using environment variables or a `.env` file. All 
 - `CERTBOX_CERT_VALIDITY_DAYS` - Client certificate validity in days (default: 365)
 - `CERTBOX_CA_VALIDITY_DAYS` - CA certificate validity in days (default: 3650)
 - `CERTBOX_KEY_SIZE` - RSA key size in bits (default: 2048)
+- `CERTBOX_PFX_PASSWORD_LENGTH` - PFX file password length (default: 12)
 
 ### API Authentication
 - `CERTBOX_API_TOKEN` - API authentication token (default: "" - authentication disabled)

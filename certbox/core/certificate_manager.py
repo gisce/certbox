@@ -3,8 +3,10 @@ Certificate management module for Certbox.
 """
 
 import datetime
+import secrets
+import string
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from fastapi import HTTPException
 from cryptography import x509
@@ -129,7 +131,15 @@ class CertificateManager:
             for serial in sorted(revoked_serials):
                 f.write(f"{serial}\n")
     
-    def _generate_and_save_certificate(self, username: str, cert_path: Path, key_path: Path, pfx_path: Path) -> x509.Certificate:
+    def _generate_pfx_password(self) -> str:
+        """Generate a secure random password for PFX files."""
+        # Create a character set that includes letters, digits, and some safe special characters
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        # Generate a cryptographically secure random password
+        password = ''.join(secrets.choice(alphabet) for _ in range(self.config.pfx_password_length))
+        return password
+    
+    def _generate_and_save_certificate(self, username: str, cert_path: Path, key_path: Path, pfx_path: Path) -> Tuple[x509.Certificate, str]:
         """Generate and save a client certificate and private key."""
         # Load CA
         ca_cert, ca_key = self._load_ca()
@@ -201,19 +211,22 @@ class CertificateManager:
                 encryption_algorithm=serialization.NoEncryption()
             ))
         
+        # Generate secure password for PFX file
+        pfx_password = self._generate_pfx_password()
+        
         # Create PFX file for browser installation
         pfx_data = pkcs12.serialize_key_and_certificates(
             name=username.encode('utf-8'),
             key=client_key,
             cert=client_cert,
             cas=[ca_cert],
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.BestAvailableEncryption(pfx_password.encode('utf-8'))
         )
         
         with open(pfx_path, "wb") as f:
             f.write(pfx_data)
         
-        return client_cert
+        return client_cert, pfx_password
 
     def create_client_certificate(self, username: str) -> Dict[str, Any]:
         """Create a client certificate for the given username."""
@@ -225,7 +238,7 @@ class CertificateManager:
         if cert_path.exists():
             raise HTTPException(status_code=409, detail=f"Certificate for user '{username}' already exists")
         
-        client_cert = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
+        client_cert, pfx_password = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
         
         return {
             "username": username,
@@ -234,7 +247,8 @@ class CertificateManager:
             "valid_until": client_cert.not_valid_after_utc.isoformat(),
             "certificate_path": str(cert_path),
             "private_key_path": str(key_path),
-            "pfx_path": str(pfx_path)
+            "pfx_path": str(pfx_path),
+            "pfx_password": pfx_password
         }
     
     def revoke_certificate(self, username: str) -> Dict[str, Any]:
@@ -287,7 +301,7 @@ class CertificateManager:
             old_serial = old_cert.serial_number
         
         # Generate and save new certificate (overwriting existing files)
-        client_cert = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
+        client_cert, pfx_password = self._generate_and_save_certificate(username, cert_path, key_path, pfx_path)
         
         # Revoke old certificate if requested
         if revoke_old and old_serial:
@@ -302,6 +316,7 @@ class CertificateManager:
             "certificate_path": str(cert_path),
             "private_key_path": str(key_path),
             "pfx_path": str(pfx_path),
+            "pfx_password": pfx_password,
             "old_serial_revoked": str(old_serial) if revoke_old and old_serial else None
         }
     
