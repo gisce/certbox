@@ -223,7 +223,8 @@ class TestCLIModuleIntegration:
                 'valid_until': '2026-01-01',
                 'certificate_path': '/path/cert',
                 'private_key_path': '/path/key',
-                'pfx_path': '/path/pfx'
+                'pfx_path': '/path/pfx',
+                'pfx_password': 'test_password123'
             }
             
             # Test create command calls CertificateManager directly
