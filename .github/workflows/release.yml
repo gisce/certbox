@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PUB_MASTER_PUSH_TOKEN }}
         
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -300,11 +300,11 @@ jobs:
     - name: Publish to PyPI
       if: steps.version-bump.outputs.skip_release != 'true' && github.event.inputs.skip_publish != 'true'
       env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_USERNAME: gisce
+        TWINE_PASSWORD: ${{ secrets.PYPI_MASTER_TOKEN }}
       run: |
         if [ -z "$TWINE_PASSWORD" ]; then
-          echo "⚠️ PYPI_API_TOKEN not set, skipping PyPI publish"
+          echo "⚠️ PYPI_MASTER_TOKEN not set, skipping PyPI publish"
         else
           echo "📦 Publishing to PyPI..."
           python -m twine upload dist/*
@@ -323,8 +323,8 @@ jobs:
         echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
         echo "- GitHub release created with changelog" >> $GITHUB_STEP_SUMMARY
         echo "- Version updated in codebase" >> $GITHUB_STEP_SUMMARY
-        if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
+        if [ -n "${{ secrets.PYPI_MASTER_TOKEN }}" ]; then
           echo "- Package published to PyPI" >> $GITHUB_STEP_SUMMARY
         else
-          echo "- 📦 PyPI publishing skipped (PYPI_API_TOKEN not configured)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 PyPI publishing skipped (PYPI_MASTER_TOKEN not configured)" >> $GITHUB_STEP_SUMMARY
         fi
