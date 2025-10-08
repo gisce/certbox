@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from ..core import CertificateManager
 from ..config import config
 from ..auth import verify_token
+from .. import __version__
 
 # Initialize certificate manager
 cert_manager = CertificateManager()
@@ -123,7 +124,7 @@ async def root():
     return {
         "service": "Certbox",
         "description": "X.509 Certificate Management Service",
-        "version": "1.0.0",
+        "version": __version__,
         "endpoints": {
             "create_certificate": "POST /certs/{username}",
             "revoke_certificate": "POST /revoke/{username}",

@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from .core import CertificateManager
 from .app import app
 from .config import config as certbox_config, create_config, CertConfig
+from . import __version__
 
 
 # Global variable to store the current configuration
@@ -18,7 +19,7 @@ current_config: Optional[CertConfig] = None
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="certbox")
+@click.version_option(version=__version__, prog_name="certbox")
 @click.option('--config', 'config_file', help='Path to configuration file')
 def cli(config_file: Optional[str] = None):
     """Certbox - X.509 Certificate Management Service CLI"""
