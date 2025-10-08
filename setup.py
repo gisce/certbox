@@ -4,6 +4,16 @@ Setup configuration for Certbox.
 
 from setuptools import setup, find_packages
 from pathlib import Path
+import re
+
+# Read version from package __init__.py
+init_path = Path(__file__).parent / "certbox" / "__init__.py"
+with open(init_path, "r", encoding="utf-8") as f:
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", f.read(), re.M)
+    if version_match:
+        version = version_match.group(1)
+    else:
+        raise RuntimeError("Unable to find version string in certbox/__init__.py")
 
 # Read long description from README
 readme_path = Path(__file__).parent / "README.md"
@@ -18,7 +28,7 @@ if requirements_path.exists():
 
 setup(
     name="certbox",
-    version="1.0.0",
+    version=version,
     author="GISCE-TI",
     author_email="devel@gisce.net",
     description="X.509 Certificate Management Service",
