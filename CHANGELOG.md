@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+
+## [1.1.1] - 2025-10-08
+
+### ✅ Tests
+
+- **cli**: Assert CLI version dynamically from package __version__ ([commit_](https://github.com/gisce/certbox/commit/commit_1))
+
+### 👷 CI/CD
+
+- Use PyPI API token (__token__) for twine upload; document PYPI_MASTER_TOKEN ([commit_](https://github.com/gisce/certbox/commit/commit_2))
 ## [1.1.0] - 2025-10-08
 
 ### 👷 CI/CD
