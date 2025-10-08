@@ -49,7 +49,9 @@ class TestCertboxCLI:
         """Test CLI version command."""
         code, stdout, stderr = self.run_command("certbox --version")
         assert code == 0, f"Version command failed: {stderr}"
-        assert "1.0.0" in stdout
+        # Ensure the CLI reports the package version dynamically
+        from certbox import __version__ as pkg_version
+        assert pkg_version in stdout
 
     def test_cli_certificate_create(self):
         """Test CLI certificate creation."""

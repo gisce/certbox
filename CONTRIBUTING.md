@@ -171,6 +171,18 @@ When your PR is merged to `main`, the automated release system:
 6. **Creates GitHub release** with changelog
 7. **Publishes to PyPI** (if configured)
 
+### Publishing to PyPI (repository maintainers)
+
+To enable publishing to PyPI from the automated release workflow you must add a repository secret containing a PyPI API token.
+
+- Create an API token on PyPI (https://pypi.org/manage/account/#api-tokens) with the desired scope (project or full).
+- In your GitHub repository, go to Settings → Secrets and variables → Actions → New repository secret.
+- Add a secret named `PYPI_MASTER_TOKEN` and paste the token value.
+
+The workflow uses token-based authentication with Twine. When using an API token, Twine expects the username to be `__token__` and the token itself to be provided as the password (the workflow sets `TWINE_USERNAME: __token__` and reads the token from the `PYPI_MASTER_TOKEN` secret).
+
+If you'd prefer a different secret name (for example to match conventions in other repos like `PYPI_API_TOKEN_GITHUB_GESTIONATR`), update the secret name in the workflow at `.github/workflows/release.yml` accordingly.
+
 ## 🔍 Special Cases
 
 ### Documentation-Only Changes

@@ -300,7 +300,9 @@ jobs:
     - name: Publish to PyPI
       if: steps.version-bump.outputs.skip_release != 'true' && github.event.inputs.skip_publish != 'true'
       env:
-        TWINE_USERNAME: gisce
+        # When using an API token, the username must be "__token__" and the token goes in the password field.
+        # See: https://pypi.org/help/#apitoken
+        TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_MASTER_TOKEN }}
       run: |
         if [ -z "$TWINE_PASSWORD" ]; then
