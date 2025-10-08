@@ -244,6 +244,8 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
+        # Configure git to use the bypass token for authentication
+        git remote set-url origin https://x-access-token:${{ secrets.PUB_MASTER_PUSH_TOKEN }}@github.com/${{ github.repository }}.git
         git add certbox/__init__.py CHANGELOG.md
         git commit -m "chore: release v${{ steps.version-bump.outputs.new_version }} [skip ci]"
         git push
@@ -251,6 +253,8 @@ jobs:
     - name: Create release tag
       if: steps.version-bump.outputs.skip_release != 'true'
       run: |
+        # Configure git to use the bypass token for authentication
+        git remote set-url origin https://x-access-token:${{ secrets.PUB_MASTER_PUSH_TOKEN }}@github.com/${{ github.repository }}.git
         git tag -a "v${{ steps.version-bump.outputs.new_version }}" -m "Release v${{ steps.version-bump.outputs.new_version }}"
         git push origin "v${{ steps.version-bump.outputs.new_version }}"
         
