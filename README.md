@@ -23,6 +23,7 @@ Certbox is a lightweight REST API for managing client X.509 certificates using a
 - [Browser Certificate Import](#browser-certificate-import)
 - [Nginx mTLS Configuration](#nginx-mtls-configuration)
 - [Testing](#testing)
+- [Versioning and Releases](#versioning-and-releases)
 - [Configuration](#configuration)
 - [Security Notes](#security-notes)
 - [License](#license)
@@ -646,6 +647,56 @@ The test suite includes:
 - **Integration tests with mocked dependencies** - Isolated testing without external dependencies
 
 Tests are also run automatically via GitHub Actions on Python 3.8, 3.9, 3.10, 3.11, and 3.12.
+
+## Versioning and Releases
+
+Certbox follows [Semantic Versioning](https://semver.org/) and uses an automated hybrid versioning system that combines conventional commits with manual label overrides.
+
+### How It Works
+
+1. **Automatic Version Detection**: The system analyzes commit messages following [Conventional Commits](https://www.conventionalcommits.org/) format:
+   - `feat:` → Minor version bump (new features)
+   - `fix:` → Patch version bump (bug fixes)
+   - `feat!` or `BREAKING CHANGE:` → Major version bump (breaking changes)
+
+2. **Manual Override**: You can override automatic detection by adding exactly one release label to your PR:
+   - `release:major` → Major version bump (x.0.0)
+   - `release:minor` → Minor version bump (x.y.0)  
+   - `release:patch` → Patch version bump (x.y.z)
+
+3. **Validation**: All PRs are automatically validated to ensure consistency between commits and labels.
+
+### Release Process
+
+When a PR is merged to `main`, the system automatically:
+- ✅ Determines the appropriate version bump
+- ✅ Updates the version in `certbox/__init__.py`
+- ✅ Generates/updates the CHANGELOG.md
+- ✅ Creates a git tag
+- ✅ Creates a GitHub release
+- ✅ Publishes to PyPI (if configured)
+
+### Contributing Guidelines
+
+When contributing to Certbox:
+
+1. **Use Conventional Commits** (recommended):
+   ```
+   feat(api): add certificate renewal endpoint
+   fix(cli): resolve config file parsing issue
+   docs: update installation instructions
+   ```
+
+2. **Or use Release Labels**: Add exactly one label (`release:major`, `release:minor`, or `release:patch`) to your PR
+
+3. **Breaking Changes**: Use `feat!:` or include `BREAKING CHANGE:` in the commit body, or add `release:major` label
+
+4. **Edge Cases**:
+   - Documentation-only changes → `release:patch` or will default to patch
+   - Internal refactoring → `refactor:` (patch) or `release:patch` if breaking
+   - CI/build changes → `ci:` or `build:` (patch)
+
+The PR validation system will check your changes and provide feedback on the expected version bump.
 
 ## Configuration
 

@@ -1,0 +1,170 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, labeled, unlabeled]
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        
+    - name: Get PR information
+      id: pr-info
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+          
+          const { data: commits } = await github.rest.pulls.listCommits({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+          
+          // Extract commit messages
+          const commitMessages = commits.map(commit => commit.commit.message);
+          
+          // Extract labels
+          const labels = pr.labels.map(label => label.name);
+          
+          core.setOutput('commit-messages', JSON.stringify(commitMessages));
+          core.setOutput('labels', JSON.stringify(labels));
+          core.setOutput('pr-title', pr.title);
+          
+    - name: Validate version bump consistency
+      run: |
+        cat > validate_pr.py << 'EOF'
+        #!/usr/bin/env python3
+        import json
+        import sys
+        import os
+        
+        # Add scripts to path
+        sys.path.insert(0, '.github/scripts')
+        
+        from version_utils import validate_pr_consistency, BumpType
+        
+        # Get inputs from environment
+        commit_messages = json.loads(os.environ['COMMIT_MESSAGES'])
+        labels = json.loads(os.environ['LABELS'])
+        pr_title = os.environ['PR_TITLE']
+        
+        print(f"🔍 Validating PR: {pr_title}")
+        print(f"📝 Found {len(commit_messages)} commits")
+        print(f"🏷️  Found {len(labels)} labels")
+        
+        # Show labels for debugging
+        if labels:
+            print(f"📋 Labels: {', '.join(labels)}")
+        
+        try:
+            bump_type, warnings = validate_pr_consistency(commit_messages, labels)
+            
+            print(f"✅ Validation passed")
+            print(f"📦 Recommended version bump: {bump_type.value}")
+            
+            if warnings:
+                print("⚠️  Warnings:")
+                for warning in warnings:
+                    print(f"   - {warning}")
+            
+            # Set outputs for the next step
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                f.write(f"bump-type={bump_type.value}\n")
+                f.write(f"warnings={json.dumps(warnings)}\n")
+                
+        except ValueError as e:
+            print(f"❌ Validation failed: {e}")
+            sys.exit(1)
+        EOF
+        
+        python validate_pr.py
+      env:
+        COMMIT_MESSAGES: ${{ steps.pr-info.outputs.commit-messages }}
+        LABELS: ${{ steps.pr-info.outputs.labels }}
+        PR_TITLE: ${{ steps.pr-info.outputs.pr-title }}
+      id: validate
+        
+    - name: Post validation results
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number
+          });
+          
+          // Remove any existing validation comments from this bot
+          const botComments = comments.filter(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🔍 **PR Validation Results**')
+          );
+          
+          for (const comment of botComments) {
+            await github.rest.issues.deleteComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: comment.id
+            });
+          }
+          
+          // Get validation results
+          const bumpType = process.env.BUMP_TYPE || 'unknown';
+          const warnings = process.env.WARNINGS ? JSON.parse(process.env.WARNINGS) : [];
+          const success = process.env.VALIDATION_SUCCESS === 'true';
+          
+          let body = '🔍 **PR Validation Results**\n\n';
+          
+          if (success) {
+            body += `✅ **Validation Status**: Passed\n`;
+            body += `📦 **Recommended Version Bump**: \`${bumpType}\`\n\n`;
+            
+            if (warnings.length > 0) {
+              body += '⚠️ **Warnings**:\n';
+              warnings.forEach(warning => {
+                body += `- ${warning}\n`;
+              });
+              body += '\n';
+            }
+            
+            body += '### How versioning works:\n';
+            body += '- **Major** (`x.0.0`): Breaking changes (use `release:major` label or `feat!`/`BREAKING CHANGE`)\n';
+            body += '- **Minor** (`x.y.0`): New features (use `release:minor` label or `feat:` commits)\n';
+            body += '- **Patch** (`x.y.z`): Bug fixes and improvements (use `release:patch` label or `fix:` commits)\n\n';
+            body += '💡 You can override the automatic detection by adding exactly one of: `release:major`, `release:minor`, or `release:patch` labels.\n';
+          } else {
+            body += `❌ **Validation Status**: Failed\n`;
+            body += `📋 Please check the action logs for details.\n\n`;
+            body += '### Common issues:\n';
+            body += '- Multiple release labels (only one allowed: `release:major`, `release:minor`, or `release:patch`)\n';
+            body += '- Need to add conventional commit format or release label\n';
+          }
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: body
+          });
+      env:
+        BUMP_TYPE: ${{ steps.validate.outputs.bump-type }}
+        WARNINGS: ${{ steps.validate.outputs.warnings }}
+        VALIDATION_SUCCESS: ${{ steps.validate.outcome == 'success' }}
