@@ -40,6 +40,11 @@ def get_cert_manager() -> CertificateManager:
 @click.option('--port', default=8000, help='Port to bind the API server to')
 def api(host: str, port: int):
     """Start the Certbox API server."""
+    # Set active config before starting API
+    from .config import set_active_config
+    if current_config:
+        set_active_config(current_config)
+    
     click.echo(f"Starting Certbox API server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 

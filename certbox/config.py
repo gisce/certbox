@@ -3,7 +3,7 @@ Configuration module for Certbox.
 """
 
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -32,10 +32,12 @@ class CertConfig(BaseSettings):
     # PFX password configuration
     pfx_password_length: int = 12
 
-    class Config:
-        env_prefix = "CERTBOX_"
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_prefix="CERTBOX_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 
 def create_config(config_file: Optional[str] = None) -> CertConfig:
@@ -75,6 +77,21 @@ def get_directories(config_instance: CertConfig):
 
 # Global configuration instance
 config = CertConfig()
+
+# Active config (can be set by CLI)
+_active_config: Optional[CertConfig] = None
+
+
+def set_active_config(config_instance: CertConfig):
+    """Set the active configuration."""
+    global _active_config
+    _active_config = config_instance
+
+
+def get_active_config() -> CertConfig:
+    """Get the active configuration, or default if not set."""
+    return _active_config if _active_config is not None else config
+
 
 # Legacy constants for backward compatibility
 CERT_VALIDITY_DAYS = config.cert_validity_days

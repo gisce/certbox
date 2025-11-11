@@ -5,7 +5,7 @@ Test suite for Certbox API using pytest
 
 import pytest
 import time
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 from certbox.app import app
 from certbox.core.certificate_manager import CertificateManager
@@ -30,10 +30,12 @@ class TestCertboxAPI:
     
     def test_config_endpoint_data(self):
         """Test configuration endpoint returns expected fields."""
-        from certbox.api.routes import get_config
+        from certbox.api.routes import get_config, get_cert_manager
         import asyncio
         
-        result = asyncio.run(get_config())
+        # Get cert manager and call endpoint with it
+        cert_mgr = get_cert_manager()
+        result = asyncio.run(get_config(cert_manager=cert_mgr))
         assert "cert_validity_days" in result
         assert "ca_validity_days" in result
         assert "key_size" in result
@@ -107,37 +109,39 @@ class TestAPIIntegration:
     @pytest.fixture
     def mock_cert_manager(self):
         """Mock certificate manager for testing."""
-        with patch('certbox.api.routes.cert_manager') as mock:
-            mock.create_client_certificate.return_value = {
-                "username": "test_user",
-                "serial_number": "12345",
-                "status": "created"
-            }
-            mock.revoke_certificate.return_value = {
-                "username": "test_user", 
-                "status": "revoked"
-            }
-            mock.renew_certificate.return_value = {
-                "username": "test_user",
-                "serial_number": "67890",
-                "old_serial_revoked": "12345"
-            }
-            mock.get_crl.return_value = b"-----BEGIN X509 CRL-----\ntest_data\n-----END X509 CRL-----"
-            mock.get_certificate_info.return_value = {
-                "username": "test_user",
-                "serial_number": "12345",
-                "subject": {"common_name": "test_user"},
-                "issuer": {"common_name": "GISCE-TI CA"},
-                "valid_from": "2023-10-03T08:12:29",
-                "valid_until": "2024-10-03T08:12:29",
-                "status": "valid",
-                "is_revoked": False,
-                "certificate_path": "/path/to/cert.crt",
-                "private_key_path": "/path/to/key.key",
-                "pfx_path": "/path/to/cert.pfx",
-                "key_usage": {"digital_signature": True, "key_encipherment": True},
-                "extensions": {"basic_constraints": {"ca": False, "path_length": None}}
-            }
+        mock = MagicMock()
+        mock.create_client_certificate.return_value = {
+            "username": "test_user",
+            "serial_number": "12345",
+            "status": "created"
+        }
+        mock.revoke_certificate.return_value = {
+            "username": "test_user", 
+            "status": "revoked"
+        }
+        mock.renew_certificate.return_value = {
+            "username": "test_user",
+            "serial_number": "67890",
+            "old_serial_revoked": "12345"
+        }
+        mock.get_crl.return_value = b"-----BEGIN X509 CRL-----\ntest_data\n-----END X509 CRL-----"
+        mock.get_certificate_info.return_value = {
+            "username": "test_user",
+            "serial_number": "12345",
+            "subject": {"common_name": "test_user"},
+            "issuer": {"common_name": "GISCE-TI CA"},
+            "valid_from": "2023-10-03T08:12:29",
+            "valid_until": "2024-10-03T08:12:29",
+            "status": "valid",
+            "is_revoked": False,
+            "certificate_path": "/path/to/cert.crt",
+            "private_key_path": "/path/to/key.key",
+            "pfx_path": "/path/to/cert.pfx",
+            "key_usage": {"digital_signature": True, "key_encipherment": True},
+            "extensions": {"basic_constraints": {"ca": False, "path_length": None}}
+        }
+        
+        with patch('certbox.api.routes.get_cert_manager', return_value=mock):
             yield mock
     
     def test_certificate_creation_logic(self, mock_cert_manager):
@@ -145,7 +149,7 @@ class TestAPIIntegration:
         from certbox.api.routes import create_certificate
         import asyncio
         
-        result = asyncio.run(create_certificate("test_user", authenticated=True))
+        result = asyncio.run(create_certificate("test_user", authenticated=True, cert_manager=mock_cert_manager))
         assert result["username"] == "test_user"
         assert "serial_number" in result
         mock_cert_manager.create_client_certificate.assert_called_once_with("test_user")
@@ -155,7 +159,7 @@ class TestAPIIntegration:
         from certbox.api.routes import revoke_certificate
         import asyncio
         
-        result = asyncio.run(revoke_certificate("test_user", authenticated=True))
+        result = asyncio.run(revoke_certificate("test_user", authenticated=True, cert_manager=mock_cert_manager))
         assert result["username"] == "test_user"
         assert result["status"] == "revoked"
         mock_cert_manager.revoke_certificate.assert_called_once_with("test_user")
@@ -166,14 +170,14 @@ class TestAPIIntegration:
         import asyncio
         
         # Test renewal with revoke old (default)
-        result = asyncio.run(renew_certificate("test_user", keep_old=False, authenticated=True))
+        result = asyncio.run(renew_certificate("test_user", keep_old=False, authenticated=True, cert_manager=mock_cert_manager))
         assert result["username"] == "test_user"
         assert "serial_number" in result
         mock_cert_manager.renew_certificate.assert_called_once_with("test_user", revoke_old=True)
         
         # Reset mock and test keep old
         mock_cert_manager.reset_mock()
-        result = asyncio.run(renew_certificate("test_user", keep_old=True, authenticated=True))
+        result = asyncio.run(renew_certificate("test_user", keep_old=True, authenticated=True, cert_manager=mock_cert_manager))
         mock_cert_manager.renew_certificate.assert_called_once_with("test_user", revoke_old=False)
 
     def test_certificate_info_logic(self, mock_cert_manager):
@@ -181,7 +185,7 @@ class TestAPIIntegration:
         from certbox.api.routes import get_certificate_info
         import asyncio
         
-        result = asyncio.run(get_certificate_info("test_user", authenticated=True))
+        result = asyncio.run(get_certificate_info("test_user", authenticated=True, cert_manager=mock_cert_manager))
         assert result["username"] == "test_user"
         assert result["serial_number"] == "12345"
         assert result["status"] == "valid"
