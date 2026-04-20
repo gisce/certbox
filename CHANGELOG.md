@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.1.4] - 2026-04-20
+
+### 🔧 Chores
+
+- **deps**: Bump cryptography from 44.0.1 to 46.0.6 ([commit_](https://github.com/gisce/certbox/commit/commit_1))
 ## [1.1.3] - 2025-12-02
 
 ### 🔧 Chores
